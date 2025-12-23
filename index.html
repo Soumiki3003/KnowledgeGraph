@@ -152,7 +152,7 @@
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-d3.json("graph1.json").then(function(root) {
+d3.json("graph.json").then(function(root) {
   const svg = d3.select("svg"), width=+svg.attr("width"), height=+svg.attr("height");
   const color=d3.scaleOrdinal().domain(["C","P","A"]).range(["#FFD966","#6FA8DC","#93C47D"]);
   const metaPanel=document.getElementById("meta-panel");
