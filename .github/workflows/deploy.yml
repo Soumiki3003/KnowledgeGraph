@@ -3,27 +3,36 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main  # or the branch you want to deploy from
+      - main  # change if you're deploying from a different branch
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Pages
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v4
 
-      - name: Upload artifact for deployment
-        uses: actions/upload-pages-artifact@v1
+      - name: Upload site files
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: |
-            index.html
-            graph.json
-            # Add other assets or folders here if needed
-            # e.g., assets/, css/, js/
-      
+          path: .
+
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+        id: deployment
+        uses: actions/deploy-pages@v4
