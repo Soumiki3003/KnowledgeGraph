@@ -1,0 +1,37 @@
+[project]
+name = "knowledgegraph"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bcrypt>=5.0.0",
+    "beautifulsoup4>=4.14.3",
+    "bootstrap-flask>=2.5.0",
+    "dependency-injector>=4.48.3",
+    "flask>=3.1.2",
+    "neo4j>=6.1.0",
+    "neo4j-graphrag>=1.13.0",
+    "opencv-python>=4.13.0.92",
+    "pdf2image>=1.17.0",
+    "pillow>=12.1.0",
+    "pydantic-ai>=1.56.0",
+    "pymupdf>=1.26.7",
+    "pytesseract>=0.3.13",
+    "python-pptx>=1.0.2",
+    "pyyaml>=6.0.3",
+    "sqlmodel>=0.0.32",
+]
+
+[dependency-groups]
+dev = [
+    "black>=26.1.0",
+    "isort>=7.0.0",
+    "pytest>=9.0.2",
+    "langchain>=1.2.9",
+    "langchain-community>=0.4.1",
+    "langchain-core>=1.2.9",
+    "langchain-openai>=1.1.7",
+    "google-genai>=1.62.0",
+    "langchain-ollama>=1.0.1",
+]

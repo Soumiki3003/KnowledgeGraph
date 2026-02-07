@@ -1,0 +1,40 @@
+core:
+  logging:
+    version: 1
+    formatters:
+      standard:
+        format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: standard
+        level: ${LOG_LEVEL:INFO}
+    root:
+      handlers: [console]
+      level: ${LOG_LEVEL:INFO}
+
+gateways:
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    user: ${NEO4J_USER:neo4j}
+    password: ${NEO4J_PASS:password}
+  
+  llm:
+    graph:
+      model: "ollama:llama3"
+
+  embedding:
+    graph:
+      model: "ollama:nomic-embed-text"
+
+flask:
+  secret_key: ${SECRET_KEY:dev-secret}
+  debug: ${FLASK_DEBUG:true}
+
+upload:
+  folder: app/static/uploads
+  max_size_mb: 16
+  allowed_extensions:
+    - pdf
+    - pptx
+    - html
