@@ -1,14 +1,26 @@
-from contextlib import contextmanager
-import logging
-from neo4j import Driver, GraphDatabase
 import asyncio
-from neo4j_graphrag.tool import Tool
-from neo4j_graphrag.llm.base import LLMInterface, LLMMessage, MessageHistory
-from neo4j_graphrag.utils.rate_limit import RateLimitHandler, DEFAULT_RATE_LIMIT_HANDLER
-from neo4j_graphrag.llm.types import LLMResponse
-from neo4j_graphrag.embeddings.base import Embedder as EmbedderInterface
-import pydantic_ai
+import logging
+from contextlib import contextmanager
+from typing import Sequence
 
+from neo4j import Driver, GraphDatabase
+from neo4j_graphrag.embeddings.base import Embedder as EmbedderInterface
+from neo4j_graphrag.llm.base import LLMInterface
+from neo4j_graphrag.llm.types import LLMResponse
+from neo4j_graphrag.message_history import MessageHistory
+from neo4j_graphrag.tool import Tool
+from neo4j_graphrag.types import LLMMessage
+from pydantic_ai import (
+    Agent,
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    ModelSettings,
+    SystemPromptPart,
+    TextPart,
+    UserContent,
+    UserPromptPart,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,46 +67,57 @@ class Neo4jDriver:
 class Neo4jAgent(LLMInterface):
     async def __run_agent(
         self,
-        agent: pydantic_ai.Agent,
+        agent: Agent,
         input: list[LLMMessage],
         message_history: list[LLMMessage] | MessageHistory | None = None,
-    ):
-        parsed_message_history = []
+    ) -> LLMResponse:
+        parsed_input: list[UserContent] = [
+            message["content"] for message in input if message["role"] == "user"
+        ]
+        parsed_message_history: list[ModelMessage] = []
         for message in (
             message_history.messages
             if isinstance(message_history, MessageHistory)
             else (message_history or [])
         ):
-            if message.role == "system":
-                agent_message = pydantic_ai.ModelMessage(
-                    parts=pydantic_ai.SystemPromptPart(message.content),
+            role = message["role"]
+            content = message["content"]
+
+            if role == "system":
+                agent_message = ModelRequest(
+                    parts=[SystemPromptPart(content)],
                 )
-            elif message.role == "user":
-                agent_message = pydantic_ai.ModelMessage(
-                    parts=pydantic_ai.UserPromptPart(message.content),
+            elif role == "user":
+                agent_message = ModelRequest(
+                    parts=[UserPromptPart(message["content"])],
                 )
-            elif message.role == "assistant":
-                agent_message = pydantic_ai.ModelMessage(
-                    parts=pydantic_ai.TextPart(message.content),
+            elif role == "assistant":
+                agent_message = ModelResponse(
+                    parts=[TextPart(content)],
                 )
             else:
-                raise ValueError(f"Invalid message role: {message.role}")
+                raise ValueError(f"Invalid message role: {role}")
             parsed_message_history.append(agent_message)
 
-        async def run() -> LLMResponse:
+        async def run(
+            agent: Agent,
+            input: str | list[UserContent],
+            message_history: list[ModelMessage],
+        ) -> LLMResponse:
             response = await agent.run(
                 input,
-                message_history=parsed_message_history,
+                message_history=message_history,
             )
-            return LLMResponse(
-                text=response.output,
-            )
+            return LLMResponse(content=response.output)
 
-        return await self._rate_limit_handler.handle_async(run)
+        result = await self._rate_limit_handler.handle_async(run)(
+            agent, parsed_input, parsed_message_history
+        )
+        return result
 
     def invoke(
         self,
-        input: list[LLMMessage],
+        input: str,
         message_history: list[LLMMessage] | MessageHistory | None = None,
         system_instruction: str | None = None,
     ) -> LLMResponse:
@@ -102,42 +125,41 @@ class Neo4jAgent(LLMInterface):
 
     async def ainvoke(
         self,
-        input: list[LLMMessage],
+        input: str,
         message_history: list[LLMMessage] | MessageHistory | None = None,
         system_instruction: str | None = None,
     ) -> LLMResponse:
-        agent = pydantic_ai.Agent(
-            model=self.model_name,
-            model_params=self.model_params,
-            system_instruction=system_instruction,
-            **self.model_params,
+        agent = Agent(
+            self.model_name,
+            system_prompt=system_instruction or (),
+            model_settings=ModelSettings(**self.model_params) or None,
         )
+        parsed_input = [LLMMessage(role="user", content=input)]
 
-        return await self.__run_agent(agent, input, message_history, system_instruction)
+        return await self.__run_agent(agent, parsed_input, message_history)
 
     async def ainvoke_with_tools(
         self,
-        input: list[LLMMessage],
-        tools: list[Tool],
+        input: str,
+        tools: Sequence[Tool],
         message_history: list[LLMMessage] | MessageHistory | None = None,
         system_instruction: str | None = None,
     ) -> LLMResponse:
         supported_tools = [
-            pydantic_ai.Tool.from_schema(
-                tool.execute,
+            Tool(
+                execute_func=tool.execute,
                 name=tool.get_name(),
                 description=tool.get_description(),
-                function_schema=tool.get_parameters(),
+                parameters=tool.get_parameters(),
             )
             for tool in tools
         ]
 
-        agent = pydantic_ai.Agent(
+        agent = Agent(
             model=self.model_name,
-            model_params=self.model_params,
-            system_instruction=system_instruction,
+            model_settings=ModelSettings(**self.model_params) or None,
+            system_prompt=system_instruction or (),
             tools=supported_tools,
-            **self.model_params,
         )
 
         return await self.__run_agent(agent, input, message_history)
@@ -155,7 +177,7 @@ class Neo4jAgent(LLMInterface):
 
 
 class Neo4jEmbedder(EmbedderInterface):
-    def __init__(self, embedder: pydantic_ai.Embedder) -> None:
+    def __init__(self, embedder: Embedder) -> None:
         self.__embedder = embedder
         super().__init__()
 

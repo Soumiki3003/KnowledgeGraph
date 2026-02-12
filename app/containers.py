@@ -1,14 +1,17 @@
+import logging.config
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
+
 from dependency_injector import containers, providers
-import logging.config
-from pydantic_ai import Embedder, Agent
-from . import gateways, services, controllers
-from neo4j_graphrag.retrievers import VectorRetriever
-from neo4j_graphrag.generation import GraphRAG
 from jinja2 import Environment, FileSystemLoader
-from app import models, prompts
+from neo4j_graphrag.generation import GraphRAG
+from neo4j_graphrag.retrievers import VectorRetriever
+from pydantic_ai import Agent, Embedder
+
+from app import prompts
+
+from . import controllers, gateways, services
 
 
 @contextmanager
@@ -33,7 +36,7 @@ class Core(containers.DeclarativeContainer):
     static_folder = providers.Singleton(folder, folderpath=_STATIC_FOLDER)
     uploads_folder = providers.Resource(folder, folderpath=_UPLOADS_FOLDER)
 
-    web_templates_folder = providers.Singleton(_TEMPLATES_FOLDER / "web")
+    web_templates_folder = _TEMPLATES_FOLDER / "web"
 
 
 class AI(containers.DeclarativeContainer):
@@ -41,7 +44,7 @@ class AI(containers.DeclarativeContainer):
 
     prompt_template_env = providers.Singleton(
         Environment,
-        loader=FileSystemLoader(providers.Singleton(_TEMPLATES_FOLDER / "prompts")),
+        loader=FileSystemLoader(_TEMPLATES_FOLDER / "prompts"),
         autoescape=True,
     )
 
