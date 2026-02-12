@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from contextlib import contextmanager
 from typing import Sequence
@@ -6,21 +7,25 @@ from typing import Sequence
 from neo4j import Driver, GraphDatabase
 from neo4j_graphrag.embeddings.base import Embedder as EmbedderInterface
 from neo4j_graphrag.llm.base import LLMInterface
-from neo4j_graphrag.llm.types import LLMResponse
+from neo4j_graphrag.llm.types import LLMResponse, ToolCall, ToolCallResponse
 from neo4j_graphrag.message_history import MessageHistory
 from neo4j_graphrag.tool import Tool
 from neo4j_graphrag.types import LLMMessage
 from pydantic_ai import (
     Agent,
+    AgentRunResult,
+    Embedder,
     ModelMessage,
     ModelRequest,
     ModelResponse,
     ModelSettings,
     SystemPromptPart,
     TextPart,
+    ToolCallPart,
     UserContent,
     UserPromptPart,
 )
+from pydantic_ai import Tool as PydanticAiTool
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +75,7 @@ class Neo4jAgent(LLMInterface):
         agent: Agent,
         input: list[LLMMessage],
         message_history: list[LLMMessage] | MessageHistory | None = None,
-    ) -> LLMResponse:
+    ) -> AgentRunResult:
         parsed_input: list[UserContent] = [
             message["content"] for message in input if message["role"] == "user"
         ]
@@ -89,7 +94,7 @@ class Neo4jAgent(LLMInterface):
                 )
             elif role == "user":
                 agent_message = ModelRequest(
-                    parts=[UserPromptPart(message["content"])],
+                    parts=[UserPromptPart(content)],
                 )
             elif role == "assistant":
                 agent_message = ModelResponse(
@@ -99,21 +104,10 @@ class Neo4jAgent(LLMInterface):
                 raise ValueError(f"Invalid message role: {role}")
             parsed_message_history.append(agent_message)
 
-        async def run(
-            agent: Agent,
-            input: str | list[UserContent],
-            message_history: list[ModelMessage],
-        ) -> LLMResponse:
-            response = await agent.run(
-                input,
-                message_history=message_history,
-            )
-            return LLMResponse(content=response.output)
-
-        result = await self._rate_limit_handler.handle_async(run)(
-            agent, parsed_input, parsed_message_history
+        return await self._rate_limit_handler.handle_async(agent.run)(
+            parsed_input,
+            message_history=parsed_message_history,
         )
-        return result
 
     def invoke(
         self,
@@ -136,7 +130,8 @@ class Neo4jAgent(LLMInterface):
         )
         parsed_input = [LLMMessage(role="user", content=input)]
 
-        return await self.__run_agent(agent, parsed_input, message_history)
+        result = await self.__run_agent(agent, parsed_input, message_history)
+        return LLMResponse(content=result.output)
 
     async def ainvoke_with_tools(
         self,
@@ -144,13 +139,13 @@ class Neo4jAgent(LLMInterface):
         tools: Sequence[Tool],
         message_history: list[LLMMessage] | MessageHistory | None = None,
         system_instruction: str | None = None,
-    ) -> LLMResponse:
+    ) -> ToolCallResponse:
         supported_tools = [
-            Tool(
-                execute_func=tool.execute,
+            PydanticAiTool.from_schema(
+                function=tool.execute,
                 name=tool.get_name(),
                 description=tool.get_description(),
-                parameters=tool.get_parameters(),
+                json_schema=tool.get_parameters(),
             )
             for tool in tools
         ]
@@ -162,15 +157,29 @@ class Neo4jAgent(LLMInterface):
             tools=supported_tools,
         )
 
-        return await self.__run_agent(agent, input, message_history)
+        result = await self.__run_agent(
+            agent, [LLMMessage(role="user", content=input)], message_history
+        )
+        return ToolCallResponse(
+            content=result.output,
+            tool_calls=[
+                ToolCall(
+                    name=part.tool_name,
+                    arguments=json.loads(json.dumps(part.args or "{}")),
+                )
+                for message in result.all_messages()
+                for part in message.parts
+                if isinstance(part, ToolCallPart)
+            ],
+        )
 
     def invoke_with_tools(
         self,
-        input: list[LLMMessage],
-        tools: list[Tool],
+        input: str,
+        tools: Sequence[Tool],
         message_history: list[LLMMessage] | MessageHistory | None = None,
         system_instruction: str | None = None,
-    ) -> LLMResponse:
+    ) -> ToolCallResponse:
         return asyncio.run(
             self.ainvoke_with_tools(input, tools, message_history, system_instruction)
         )
@@ -182,8 +191,14 @@ class Neo4jEmbedder(EmbedderInterface):
         super().__init__()
 
     def embed_query(self, text: str) -> list[float]:
-        return self.__embedder.embed_sync(text).embeddings[0]
+        return list(
+            self._rate_limit_handler.handle_sync(self.__embedder.embed_documents_sync)(
+                text
+            ).embeddings[0]
+        )
 
     async def async_embed_query(self, text: str) -> list[float]:
-        result = await self.__embedder.embed(text)
-        return result.embeddings[0]
+        result = await self._rate_limit_handler.handle_async(
+            self.__embedder.embed_documents
+        )(text)
+        return list(result.embeddings[0])
