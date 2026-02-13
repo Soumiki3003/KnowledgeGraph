@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from contextlib import contextmanager
-from typing import Sequence
+from typing import Self, Sequence
 
 from neo4j import Driver, GraphDatabase
 from neo4j_graphrag.embeddings.base import Embedder as EmbedderInterface
@@ -47,6 +47,18 @@ def neo4j_session(driver: Driver, **session_kwargs):
 
 
 class Neo4jAgent(LLMInterface):
+    @classmethod
+    def from_pydantic_agent(cls, agent: Agent) -> Self:
+        if not agent.model:
+            raise ValueError("Agent model is required")
+
+        model_name = (
+            agent.model if isinstance(agent.model, str) else agent.model.model_name
+        )
+        model_kwargs = agent.model_settings
+
+        return cls(model_name=model_name, model_kwargs=model_kwargs)
+
     async def __run_agent(
         self,
         agent: Agent,

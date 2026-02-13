@@ -16,22 +16,28 @@ core:
   uploads:
     allowed_extensions: ${ALLOWED_EXTENSIONS:pdf,pptx,html}
 
-agents:
-  default:
-    model: "ollama:llama3"
-  knowledge_file:
-    model: "ollama:llama3"
+ai:
+  agents:
+    default:
+      model: "ollama:llama3"
+    knowledge_file:
+      model: "ollama:llama3"
+    graph:
+      model: "ollama:llama3"
+  embedder:
+    default:
+      model: "ollama:nomic-embed-text"
 
 gateways:
   rag:
     indexes:
       trajectory: ${TRAJECTORY_RAG_INDEX_NAME:trajectory_rag_index}
-      
+
   neo4j:
     uri: ${NEO4J_URI:bolt://localhost:7687}
     user: ${NEO4J_USER:neo4j}
     password: ${NEO4J_PASS:password}
-  
+
   llm:
     graph:
       model: "ollama:llama3"

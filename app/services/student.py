@@ -1,5 +1,4 @@
 import logging
-from time import time
 from typing import Any, Literal
 
 from neo4j import ManagedTransaction, Session, unit_of_work

@@ -1,17 +1,17 @@
-import os
-import json
 import datetime
-import neo4j
+import json
+import os
 import re
+import threading
 import time
+from dataclasses import dataclass
+
+import neo4j
 from google import genai
 from langchain_community.embeddings import OllamaEmbeddings
-from neo4j_graphrag.retrievers import VectorRetriever
-from neo4j_graphrag.generation import GraphRAG
-from neo4j_graphrag.llm.base import LLMInterface
 from langchain_community.llms import Ollama
-from dataclasses import dataclass
-import threading
+from neo4j_graphrag.generation import GraphRAG
+from neo4j_graphrag.retrievers import VectorRetriever
 
 
 @dataclass

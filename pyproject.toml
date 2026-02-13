@@ -7,7 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "bcrypt>=5.0.0",
     "beautifulsoup4>=4.14.3",
-    "bootstrap-flask>=2.5.0",
     "dependency-injector>=4.48.3",
     "flask>=3.1.2",
     "flask-pydantic>=0.14.0",
@@ -36,3 +35,6 @@ dev = [
     "google-genai>=1.62.0",
     "langchain-ollama>=1.0.1",
 ]
+
+[project.scripts]
+web = "application.app:main"

@@ -33,7 +33,7 @@ class Core(containers.DeclarativeContainer):
     config = providers.Configuration()
 
     logging = providers.Resource(logging.config.dictConfig, config=config.logging)
-    static_folder = providers.Singleton(folder, folderpath=_STATIC_FOLDER)
+    static_folder = providers.Resource(folder, folderpath=_STATIC_FOLDER)
     uploads_folder = providers.Resource(folder, folderpath=_UPLOADS_FOLDER)
 
     web_templates_folder = _TEMPLATES_FOLDER / "web"
@@ -69,7 +69,7 @@ class AI(containers.DeclarativeContainer):
 
     graph_agent = providers.Singleton(
         Agent,
-        model=config.graph.model.required(),
+        model=config.agents.graph.model.required(),
     )
 
 
@@ -85,8 +85,8 @@ class Gateways(containers.DeclarativeContainer):
     )
 
     neo4j_agent = providers.Singleton(
-        gateways.Neo4jAgent,
-        model_name=ai.config.provided.default.model.required(),
+        gateways.Neo4jAgent.from_pydantic_agent,
+        agent=ai.graph_agent,
     )
 
     embedder = providers.Singleton(
@@ -127,7 +127,6 @@ class Services(containers.DeclarativeContainer):
 
     ai = providers.DependenciesContainer()
     gateways = providers.DependenciesContainer()
-    prompts = providers.DependenciesContainer()
 
     file = providers.Factory(services.FileService)
     knowledge = providers.Factory(
@@ -145,10 +144,13 @@ class Application(containers.DeclarativeContainer):
     )
 
     core = providers.Container(Core, config=config.core)
-    ai = providers.Container(AI, config=config.agents)
+    ai = providers.Container(AI, config=config.ai)
     gateways = providers.Container(Gateways, config=config.gateways, ai=ai)
 
     services = providers.Container(
-        Services, config=config, gateways=gateways, core=core
+        Services,
+        config=config.services,
+        ai=ai,
+        gateways=gateways,
     )
-    controllers = providers.Container(Controllers, config=config, core=core)
+    controllers = providers.Container(Controllers, config=config.controllers, core=core)

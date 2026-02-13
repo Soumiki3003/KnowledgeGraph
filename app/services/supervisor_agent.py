@@ -6,7 +6,6 @@ from neo4j_graphrag.generation import GraphRAG
 from pydantic_ai import Agent
 
 from app import models
-from app.utils import hash_string
 
 from .student import StudentService
 
