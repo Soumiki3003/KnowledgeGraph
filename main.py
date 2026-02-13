@@ -10,6 +10,7 @@ from app.views import knowledge
 root = Flask(__name__)
 
 
+# TODO: test upload route
 def create_app():
     container = Application()
     container.init_resources()
