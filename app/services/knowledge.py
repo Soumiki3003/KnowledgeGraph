@@ -1,41 +1,113 @@
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
+import jinja2
 import pydantic_ai
 from neo4j import ManagedTransaction, Session, Transaction, unit_of_work
 from neo4j_graphrag.generation import GraphRAG
 
 from app import models, services
+from app.models.knowledge import Knowledge
 
-logger = logging.getLogger(__name__)
+
+class KnowledgeUploadService:
+    # TODO: For now it uses in memory database
+    def __init__(self, db: dict[str, models.KnowledgeUploadRecord] = {}):
+        self.__db = db
+        self.__logger = logging.getLogger(__name__)
+
+    def __get_now(self):
+        return datetime.now(timezone.utc)
+
+    def create(self, filepath: Path) -> str:
+        self.__logger.info(f"Creating upload record for file: {filepath.name}")
+        new_upload = models.KnowledgeUploadRecord(
+            filepath=filepath, created_at=self.__get_now()
+        )
+        self.__db[new_upload.id] = new_upload
+        self.__logger.debug(f"Upload record created with ID: {new_upload.id}")
+        return new_upload.id
+
+    def get(self, upload_id: str) -> models.KnowledgeUploadRecord:
+        if upload_id not in self.__db:
+            raise ValueError(f"Upload ID not found: {upload_id}")
+        return self.__db[upload_id].model_copy(deep=True)
+
+    def get_many(
+        self, *, limit: int | None = 10, offset: int = 0
+    ) -> list[models.KnowledgeUploadRecord]:
+        if offset < 0:
+            raise ValueError("Offset must be non-negative")
+        if limit is not None and limit < 0:
+            raise ValueError("Limit must be non-negative")
+
+        items = list(self.__db.values())
+        if offset:
+            items = items[offset:]
+        if limit is not None:
+            items = items[:limit]
+        return [item.model_copy(deep=True) for item in items]
+
+    def __update(self, upload_id: str, data: dict) -> models.KnowledgeUploadRecord:
+        if upload_id not in self.__db:
+            raise ValueError(f"Upload ID not found: {upload_id}")
+        for key, value in data.items():
+            setattr(self.__db[upload_id], key, value)
+        self.__db[upload_id].updated_at = self.__get_now()
+        return self.__db[upload_id].model_copy(deep=True)
+
+    def mark_as_processing(self, upload_id: str) -> models.KnowledgeUploadRecord:
+        self.__logger.info(f"Marking upload {upload_id} as PROCESSING")
+        return self.__update(
+            upload_id, {"status": models.KnowledgeUploadStatus.PROCESSING}
+        )
+
+    def mark_as_completed(self, upload_id: str) -> models.KnowledgeUploadRecord:
+        self.__logger.info(f"Marking upload {upload_id} as COMPLETED")
+        return self.__update(
+            upload_id, {"status": models.KnowledgeUploadStatus.COMPLETED}
+        )
+
+    def mark_as_failed(
+        self, upload_id: str, *, error: str
+    ) -> models.KnowledgeUploadRecord:
+        self.__logger.error(f"Marking upload {upload_id} as FAILED: {error}")
+        return self.__update(
+            upload_id,
+            {"status": models.KnowledgeUploadStatus.FAILED, "error_message": error},
+        )
+
+    def delete(self, upload_id: str):
+        if upload_id not in self.__db:
+            raise ValueError(f"Upload ID not found: {upload_id}")
+        del self.__db[upload_id]
 
 
 class KnowledgeService:
-    __vector_property_name = "vector"
+    __uploads: dict[str, models.KnowledgeUploadRecord] = {}
     __child_relation_type = "HAS_CHILD"
 
     def __init__(
         self,
         *,
-        session: Session,
-        graph_rag: GraphRAG,
+        session_factory: Callable[[], Session],
         agent: pydantic_ai.Agent,
         file_service: services.FileService,
+        upload_service: KnowledgeUploadService,
         static_folder: Path,
+        template_env: jinja2.Environment,
+        batch_size: int = 20,
     ):
         self.__agent = agent
-        self.__session = session
-        self.__graph_rag = graph_rag
+        self.__session_factory = session_factory
         self.__file_service = file_service
+        self.__upload_service = upload_service
         self.__static_folder = static_folder
-
-    @property
-    def __driver(self):
-        return self.__graph_rag.retriever.driver
-
-    @property
-    def __database(self):
-        return self.__graph_rag.retriever.neo4j_database
+        self.__logger = logging.getLogger(__name__)
+        self.__template_env = template_env
+        self.__batch_size = batch_size
 
     # def __read_json_graph(self, filepath: Path) -> dict:
     #     if not filepath.exists():
@@ -277,7 +349,7 @@ class KnowledgeService:
                     child_node = None
                     if child_ids:
                         if len(child_ids) > 1:
-                            logger.warning(
+                            self.__logger.warning(
                                 "Procedural node '%s' has multiple children; using the first",
                                 node_id,
                             )
@@ -309,35 +381,73 @@ class KnowledgeService:
                 nodes_by_id=nodes_by_id,
             )
 
-        return self.__session.execute_read(txn_fn, knowledge_id=knowledge_id)
+        with self.__session_factory() as session:
+            return session.execute_read(txn_fn, knowledge_id=knowledge_id)
 
     def create_knowledge_from_file(self, file_path: Path) -> str:
-        textual = self.__file_service.extract_textual_content(file_path)
-        visual = self.__file_service.extract_visual_content(file_path)
-        user_prompt = f"""The following extracted content contains textual and OCR segments from the source material.
-        Use it to populate the JSON fields accurately:
+        self.__logger.info(f"Starting knowledge creation from file: {file_path.name}")
+        upload_id = self.__upload_service.create(file_path)
 
-        ## Extracted Textual Content:
-        ```
-        {textual}
-        ```
+        try:
+            self.__logger.debug("Extracting textual content...")
+            textual = self.__file_service.extract_textual_content(file_path)
+            self.__logger.debug(f"Extracted {len(textual)} textual content entries")
 
-        ## Extracted Visual Content:
-        ```
-        {visual}
-        ```
-        Remember to adhere strictly to the expected JSON structure for nodes and relationships, and ensure all relevant information from the extracted content is captured in the appropriate fields.
-        """
+            self.__logger.debug("Extracting visual content...")
+            visual = self.__file_service.extract_visual_content(file_path)
+            self.__logger.debug(f"Extracted {len(visual)} visual content entries")
 
-        knowledge = self.__agent.run_sync(
-            user_prompt, output_type=models.RootKnowledge
-        ).output
-        logger.debug(f"Generated knowledge from agent: {knowledge}")
-        knowledge.override_conceptual_sources(
-            file_path.relative_to(self.__static_folder).as_posix()
-        )
+            root_knowledge = models.RootKnowledge(source=upload_id)
+            self.__upload_service.mark_as_processing(upload_id)
+            self.__logger.info("Running AI agent to generate knowledge graph...")
 
-        return self.create_knowledge(knowledge)
+            batch_size = 2  # self.__batch_size
+            for batch in range(0, len(textual), batch_size):
+                batch_text = textual[batch : batch + batch_size]
+                batch_visual = visual[batch : batch + batch_size]
+                page_nums = list(range(batch, batch + batch_size))
+                page_list = [
+                    {"text": text, "visual": visual, "page_num": num}
+                    for text, visual, num in zip(batch_text, batch_visual, page_nums)
+                ]
+                user_prompt = self.__template_env.get_template(
+                    "knowledge_user_prompt.j2"
+                ).render(
+                    source_filename=file_path.name,
+                    page_list=page_list,
+                    root_knowledge=root_knowledge.model_dump_json(by_alias=True),
+                )
+                self.__logger.info(
+                    f"Processing pages {page_nums[0]}-{page_nums[-1]}..."
+                )
+                root_knowledge = self.__agent.run_sync(
+                    user_prompt, output_type=models.RootKnowledge
+                ).output
+                self.__logger.info(
+                    f"Processing pages {page_nums[0]}-{page_nums[-1]} complete."
+                )
+
+                break
+
+            self.__logger.info("Processing all pages complete.")
+            relative_path = file_path.relative_to(self.__static_folder).as_posix()
+            self.__logger.debug(f"Setting source to: {relative_path}")
+            root_knowledge.override_conceptual_sources(relative_path)
+
+            self.__logger.info("Creating knowledge graph in Neo4j...")
+            knowledge_id = self.create_knowledge(root_knowledge)
+            self.__logger.info(
+                f"Knowledge graph created successfully with ID: {knowledge_id}"
+            )
+            self.__upload_service.mark_as_completed(upload_id)
+            return knowledge_id
+        except Exception as e:
+            self.__logger.error(
+                f"Error creating knowledge from file {file_path.name}: {e}",
+                exc_info=True,
+            )
+            self.__upload_service.mark_as_failed(upload_id, error=str(e))
+            raise
 
         # logger.info(f"Loading graph from file: {file_path}")
         # try:
@@ -411,6 +521,9 @@ class KnowledgeService:
         *,
         tx: Transaction,
     ) -> models.ConceptualKnowledge:
+        # TODO: neo4j.exceptions.CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'child_relation_type': expected '(', 'ALL' or 'ANY' (line 1, column 110 (offset: 109))
+        "MATCH (parent {id: $parent_id}) WHERE parent.type = $parent_type CREATE (n:Concept $props) MERGE (parent)-[:$child_relation_type]->(n) RETURN n"
+                                                                                                                      ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}
         query = (
             "MATCH (parent {id: $parent_id}) "
             "WHERE parent.type = $parent_type "
@@ -422,7 +535,9 @@ class KnowledgeService:
             query,  # pyright: ignore[reportArgumentType]
             parent_id=parent_id,
             parent_type=item.type_.value,
-            props=item.model_dump(by_alias=True, exclude={"children"}),
+            props={
+                **item.model_dump(by_alias=True, exclude={"children"}),
+            },
             child_relation_type=self.__child_relation_type,
         )
         record = result.single()
@@ -503,36 +618,38 @@ class KnowledgeService:
         parent_id: str | None = None,
         *,
         tx: Transaction,
-    ) -> str:
-        logger.info(
+    ) -> Knowledge:
+        self.__logger.info(
             f"Creating knowledge node with name '{item.name}' and ID '{item.id}' under parent ID '{parent_id}'"
         )
         if isinstance(item, models.RootKnowledge):
-            logger.debug("Creating root knowledge node")
+            self.__logger.debug("Creating root knowledge node")
             new_parent = self.__create_root_knowledge_node(item, tx=tx)
         else:
             if parent_id is None:
                 raise ValueError("Parent ID is required for non-root knowledge nodes")
             if isinstance(item, models.ConceptualKnowledge):
-                logger.debug("Creating conceptual knowledge node")
+                self.__logger.debug("Creating conceptual knowledge node")
                 new_parent = self.__create_conceptual_knowledge_node(
                     parent_id, item, tx=tx
                 )
             elif isinstance(item, models.AssessmentKnowledge):
-                logger.debug("Creating assessment knowledge node")
+                self.__logger.debug("Creating assessment knowledge node")
                 new_parent = self.__create_assessment_knowledge_node(
                     parent_id, item, tx=tx
                 )
             elif isinstance(item, models.ProceduralKnowledge):
-                logger.debug("Creating procedural knowledge node")
+                self.__logger.debug("Creating procedural knowledge node")
                 new_parent = self.__create_procedural_knowledge_node(
                     parent_id, item, tx=tx
                 )
             else:
                 raise TypeError(f"Unsupported knowledge type: {type(item)}")
 
-        logger.info(f"Successfully created node with ID '{new_parent.id}' in Neo4j")
-        logger.debug(
+        self.__logger.info(
+            f"Successfully created node with ID '{new_parent.id}' in Neo4j"
+        )
+        self.__logger.debug(
             f"Recursively creating child nodes for parent ID '{new_parent.id}'"
         )
 
@@ -545,42 +662,55 @@ class KnowledgeService:
 
         for child in item_children:
             self.__create_knowledge_graph(child, parent_id=new_parent.id, tx=tx)
-        logger.debug(
+        self.__logger.debug(
             f"Finished creating all child nodes for parent ID '{new_parent.id}'"
         )
 
-        return new_parent.id
+        return new_parent
+
+    def __get_all_ids_recursive(self, node: models.Knowledge) -> list[str]:
+        ids = [node.id]
+
+        if isinstance(node, models.ProceduralKnowledge) and node.child:
+            ids.extend(self.__get_all_ids_recursive(node.child))
+        elif isinstance(node, (models.ConceptualKnowledge, models.RootKnowledge)):
+            for child in node.children:
+                ids.extend(self.__get_all_ids_recursive(child))
+
+        return ids
 
     def create_knowledge(self, root: models.RootKnowledge) -> str:
-        tx = self.__session.begin_transaction()
-        try:
-            logger.info(
-                f"Starting creation of knowledge graph for root node '{root.name}'"
-            )
-            root_id = self.__create_knowledge_graph(root, tx=tx)
-            logger.info(
-                f"Completed creation of knowledge graph with root ID '{root_id}'"
-            )
-            logger.debug(
-                f"Updating conceptual knowledge relationships for root ID '{root_id}'"
-            )
-            for child in root.children:
-                logger.debug(
-                    f"Updating relationships for child node '{child.name}' with ID '{child.id}'"
+        with self.__session_factory() as session:
+            tx = session.begin_transaction()
+            try:
+                self.__logger.info(
+                    f"Starting creation of knowledge graph for root node '{root.name}'"
                 )
-                self.__update_conceptual_knowledge_relationships(
-                    child.id, child.connections, tx=tx
+                created_root = self.__create_knowledge_graph(root, tx=tx)
+                self.__logger.info(
+                    f"Completed creation of knowledge graph with root ID '{created_root.id}'"
                 )
-            logger.debug(
-                f"Finished updating relationships for all child nodes of root ID '{root_id}'"
-            )
-        except Exception as e:
-            logger.error(f"Error creating knowledge graph: {e}")
-            tx.rollback()
-            raise
-        else:
-            tx.commit()
-            return root_id
+                self.__logger.debug(
+                    f"Updating conceptual knowledge relationships for root ID '{created_root.id}'"
+                )
+                for child in root.children:
+                    self.__logger.debug(
+                        f"Updating relationships for child node '{child.name}' with ID '{child.id}'"
+                    )
+                    self.__update_conceptual_knowledge_relationships(
+                        child.id, child.connections, tx=tx
+                    )
+                self.__logger.debug(
+                    f"Finished updating relationships for all child nodes of root ID '{created_root.id}'"
+                )
+            except Exception as e:
+                self.__logger.error(f"Error creating knowledge graph: {e}")
+                tx.rollback()
+                raise
+            else:
+                tx.commit()
+
+        return created_root.id
 
     # def reembed_nodes(self) -> None:
     #     logger.info("Re-embedding all nodes in Neo4j")

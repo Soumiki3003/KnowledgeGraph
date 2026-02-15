@@ -18,5 +18,5 @@ class KnowledgeUploadRequest(BaseModel):
 
 class KnowledgeUploadResponse(BaseModel):
     uploaded: list[Path]
-    html_link: str
+    html_link: str | None
     graph_generated: bool

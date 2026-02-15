@@ -10,16 +10,11 @@ from app.utils import hash_string
 
 from .auth import AuthService
 
-logger = logging.getLogger(__name__)
-
 
 class StudentService:
     __student_node_name = "Student"
 
     __trajectory_node_name = "StudentTrajectory"
-    __trajectory_query_hash_field = "query_hash"
-    __trajectory_query_vector_field = "query_vector"
-
     __trajectory_rel_name = "HAS_TRAJECTORY"
     __trajectory_prev_rel_name = "PREVIOUS_TRAJECTORY"
 
@@ -29,17 +24,25 @@ class StudentService:
         embedder: Embedder,
         rag: GraphRAG,
         auth_service: AuthService,
+        trajectory_vector_index_field: str,
+        trajectory_full_text_index_field: str,
     ):
         self.__session = session
         self.__embedder = embedder
         self.__auth_service = auth_service
         self.__rag = rag
+        self.__trajectory_vector_index_field = trajectory_vector_index_field
+        self.__trajectory_full_text_index_field = trajectory_full_text_index_field
+        self.__logger = logging.getLogger(__name__)
 
     def create_student(self, item: schemas.CreateStudent) -> models.Student:
+        self.__logger.info(f"Creating new student with email: {item.email}")
+
         @unit_of_work()
         def tx_fn(
             tx: ManagedTransaction, item: schemas.CreateStudent
         ) -> models.Student:
+            self.__logger.debug("Hashing student password")
             password_hash = self.__auth_service.hash_password(item.password)
             item.password = password_hash
 
@@ -48,19 +51,28 @@ class StudentService:
                 "RETURN s"
             )
 
+            self.__logger.debug(f"Executing student creation query for {item.email}")
             result = tx.run(
                 query,
                 item.model_dump(by_alias=True),
                 student_node_name=self.__student_node_name,
             )
             node = result.single(strict=True)
+            self.__logger.debug("Student node created in Neo4j")
             return models.Student(**node["s"])
 
+        self.__logger.debug(
+            f"Checking if student with email {item.email} already exists"
+        )
         user_by_email = self.get_student_by_email(item.email)
         if user_by_email:
+            self.__logger.warning(
+                f"Student creation failed: email {item.email} already exists"
+            )
             raise ValueError(f"Student with email {item.email} already exists")
 
         new_user = self.__session.execute_write(tx_fn, item)
+        self.__logger.info(f"Student created successfully: {item.email}")
         return new_user
 
     def get_student(self, id: str) -> models.Student | None:
@@ -214,7 +226,7 @@ class StudentService:
                 student_node_name=self.__student_node_name,
                 trajectory_rel_name=self.__trajectory_rel_name,
                 trajectory_node_name=self.__trajectory_node_name,
-                trajectory_query_hash_field=self.__trajectory_query_hash_field,
+                trajectory_query_hash_field=self.__trajectory_full_text_index_field,
             )
             trajectories = []
             for record in result:
@@ -248,7 +260,7 @@ class StudentService:
             )
             return [models.StudentTrajectory(**item.data()) for item in result.records]
         except Exception as e:
-            logger.warning(
+            self.__logger.warning(
                 f"Vector retriever search failed during similarity retrieval: {e}"
             )
             return []
@@ -258,6 +270,9 @@ class StudentService:
         student_id: str,
         trajectory_entry: models.StudentTrajectory,
     ) -> models.StudentTrajectory:
+        self.__logger.info(f"Adding trajectory entry for student {student_id}")
+        self.__logger.debug(f"Query: {trajectory_entry.query[:100]}...")
+
         @unit_of_work()
         def tx_fn(
             tx: ManagedTransaction,
@@ -266,7 +281,7 @@ class StudentService:
         ) -> models.StudentTrajectory:
             query = """
             MATCH (s:$student_node_name) WHERE id(s) = $student_id
-            CREATE (t:$trajectory_node_name {student_id: $student_id, timestamp: $timestamp, query: $query, query_hash: $query_hash, query_vector: $query_vector, retrieved_nodes: $retrieved_nodes, scores: $scores, interaction_type: $interaction_type, query_repeat_count: $query_repeat_count, node_entry_count: $node_entry_count, response_time_sec: $response_time_sec, hint_triggered: $hint_triggered, hint_reason: $hint_reason, hint_text: $hint_text})
+            CREATE (t:$trajectory_node_name $props)
             CREATE (s)-[rel:$trajectory_rel_name]->(t)
             WITH s, t, rel
             OPTIONAL MATCH (s)-[prev_rel:$trajectory_rel_name]->(prev_t:$trajectory_node_name)
@@ -278,13 +293,16 @@ class StudentService:
             """
 
             params = trajectory_entry.model_dump(by_alias=True)
-            params[self.__trajectory_query_hash_field] = hash_string(
+            self.__logger.debug("Hashing query for full-text index")
+            params[self.__trajectory_full_text_index_field] = hash_string(
                 trajectory_entry.query
             )
-            params[self.__trajectory_query_vector_field] = (
+            self.__logger.debug("Embedding query for vector search")
+            params[self.__trajectory_vector_index_field] = (
                 self.__embedder.embed_documents_sync([trajectory_entry.query])[0]
             )
 
+            self.__logger.debug("Creating trajectory node in Neo4j")
             result = tx.run(
                 query,
                 params,
@@ -297,6 +315,7 @@ class StudentService:
             node = result.single(strict=True)
             data = dict(node["t"])
             data["student_id"] = node["student_id"]
+            self.__logger.debug("Trajectory node created successfully")
             return models.StudentTrajectory(**data)
 
         # create_fulltext_index(
@@ -313,11 +332,19 @@ class StudentService:
         #     self.__trajectory_query_vector_field,
         # )
 
-        return self.__session.execute_write(tx_fn, student_id, trajectory_entry)
+        result = self.__session.execute_write(tx_fn, student_id, trajectory_entry)
+        self.__logger.info(
+            f"Trajectory entry added successfully for student {student_id}"
+        )
+        return result
 
     def increment_trajectory_query_repeat_count(
         self, trajectory_id: str, *, increment: int = 1
     ) -> models.StudentTrajectory:
+        self.__logger.debug(
+            f"Incrementing query repeat count for trajectory {trajectory_id} by {increment}"
+        )
+
         @unit_of_work()
         def tx_fn(
             tx: ManagedTransaction,

@@ -1,10 +1,9 @@
-from pathlib import Path
-from werkzeug.datastructures import FileStorage
 import logging
-from parsers.dual_parser import parse_dualpath
-from app import schemas, services
+from pathlib import Path
 
-logger = logging.getLogger(__name__)
+from werkzeug.datastructures import FileStorage
+
+from app import schemas, services
 
 
 class KnowledgeController:
@@ -12,41 +11,138 @@ class KnowledgeController:
         self,
         uploads_folder: Path,
         knowledge_service: services.KnowledgeService,
+        uploads_service: services.KnowledgeUploadService,
     ):
+        self.__logger = logging.getLogger(__name__)
         self.__uploads_folder = uploads_folder
+        self.__uploads_service = uploads_service
         self.__knowledge_service = knowledge_service
 
     def __parse_uploaded_file(self, file: FileStorage):
+        self.__logger.info(
+            f"Starting file upload processing for: {file.filename if file else 'None'}"
+        )
+
         if file and file.filename:
             filepath = self.__uploads_folder / file.filename
-            file.save(filepath)
-            logger.debug(f"📄 Uploaded: {filepath}")
+            self.__logger.debug(f"Saving file to: {filepath}")
 
-            root_id = self.__knowledge_service.create_knowledge_from_file(filepath)
-            knowledge_graph = self.__knowledge_service.get_knowledge(root_id)
+            try:
+                file.save(filepath)
+                self.__logger.info(f"📄 File saved successfully: {filepath}")
+            except Exception as e:
+                self.__logger.error(
+                    f"Failed to save file {file.filename}: {e}", exc_info=True
+                )
+                raise
 
-            logger.debug(
+            try:
+                self.__logger.debug(f"Creating knowledge graph from file: {filepath}")
+                root_id = self.__knowledge_service.create_knowledge_from_file(filepath)
+                self.__logger.info(f"Knowledge graph root created with ID: {root_id}")
+            except Exception as e:
+                self.__logger.error(
+                    f"Failed to create knowledge from file {filepath}: {e}",
+                    exc_info=True,
+                )
+                raise
+
+            try:
+                self.__logger.debug(
+                    f"Retrieving knowledge graph for root ID: {root_id}"
+                )
+                knowledge_graph = self.__knowledge_service.get_knowledge(root_id)
+                self.__logger.info(
+                    f"Knowledge graph retrieved successfully for root ID: {root_id}"
+                )
+            except Exception as e:
+                self.__logger.error(
+                    f"Failed to retrieve knowledge graph for root ID {root_id}: {e}",
+                    exc_info=True,
+                )
+                raise
+
+            self.__logger.debug(
                 f"Generated KG JSON: \n{knowledge_graph.model_dump_json(indent=2)}"
             )
 
             return knowledge_graph
+
+        self.__logger.warning("No file or filename provided, returning None")
         return None
 
     def parse_uploaded_file_list(
         self,
         form: schemas.KnowledgeUploadRequest,
     ) -> schemas.KnowledgeUploadResponse:
+        self.__logger.info(
+            f"Processing file upload request with {len(form.files)} file(s)"
+        )
+        self.__logger.debug(f"HTML link: {form.html_link}")
+
         uploaded_paths = []
 
-        for f in form.files:
-            knowledge_graph = self.__parse_uploaded_file(f)
-            if knowledge_graph:
-                uploaded_paths.append(knowledge_graph.source)
-            else:
-                logger.warning(f"Failed to process uploaded file: {f.filename}")
+        for idx, f in enumerate(form.files, 1):
+            self.__logger.debug(
+                f"Processing file {idx}/{len(form.files)}: {f.filename if f else 'None'}"
+            )
 
-        return schemas.KnowledgeUploadResponse(
+            try:
+                knowledge_graph = self.__parse_uploaded_file(f)
+                if knowledge_graph:
+                    if source := getattr(knowledge_graph, "source", None):
+                        uploaded_paths.append(source)
+                        self.__logger.info(
+                            f"Successfully processed file {idx}/{len(form.files)}: {source}"
+                        )
+                    else:
+                        self.__logger.warning(
+                            f"Knowledge graph for file {f.filename} has no source attribute"
+                        )
+                else:
+                    self.__logger.warning(
+                        f"Failed to process uploaded file: {f.filename}"
+                    )
+            except Exception as e:
+                self.__logger.error(
+                    f"Error processing file {f.filename}: {e}", exc_info=True
+                )
+
+        self.__logger.info(
+            f"File upload complete. Successfully processed {len(uploaded_paths)}/{len(form.files)} files"
+        )
+
+        response = schemas.KnowledgeUploadResponse(
             uploaded=uploaded_paths,
             html_link=form.html_link,
             graph_generated=bool(uploaded_paths),
         )
+        self.__logger.debug(
+            f"Returning response: graph_generated={response.graph_generated}, uploaded_count={len(uploaded_paths)}"
+        )
+
+        return response
+
+    def get_uploads(self, page: int = 1, page_size: int = 10):
+        self.__logger.debug(f"Fetching uploads - page: {page}, page_size: {page_size}")
+
+        if page <= 0 or page_size <= 0:
+            self.__logger.error(
+                f"Invalid pagination parameters: page={page}, page_size={page_size}"
+            )
+            raise ValueError("Page and page_size must be positive integers")
+
+        offset = (page - 1) * page_size
+        self.__logger.debug(
+            f"Calculating offset: {offset} (page {page} * size {page_size})"
+        )
+
+        try:
+            uploads = self.__uploads_service.get_many(limit=page_size, offset=offset)
+            self.__logger.debug(
+                f"Successfully retrieved {len(uploads) if uploads else 0} uploads"
+            )
+            return uploads
+        except Exception as e:
+            self.__logger.error(f"Failed to retrieve uploads: {e}", exc_info=True)
+            raise

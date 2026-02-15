@@ -9,8 +9,6 @@ from app import models
 
 from .student import StudentService
 
-logger = logging.getLogger(__name__)
-
 
 class SupervisorAgentService:
     def __init__(
@@ -44,6 +42,7 @@ class SupervisorAgentService:
         self.__hint_by_similarity_threshold = hint_by_similarity_threshold
         self.__hint_procedural_history_limit = hint_procedural_history_limit
         self.__procedural_keywords = procedural_keywords
+        self.__logger = logging.getLogger(__name__)
 
     def __retrieve_node_metadata(self, query: str):
         start_time = time.time()
@@ -53,9 +52,9 @@ class SupervisorAgentService:
             return_context=True,
         )
         response_time_sec = round(time.time() - start_time, 2)
-        logger.info(f"Context retrieved in {response_time_sec} seconds")
+        self.__logger.info(f"Context retrieved in {response_time_sec} seconds")
 
-        logger.info("Parsing retriever results for node metadata...")
+        self.__logger.info("Parsing retriever results for node metadata...")
         retrieved_nodes, scores = [], []
         if retriever_result := result.retriever_result:
             try:
@@ -69,9 +68,9 @@ class SupervisorAgentService:
                     if isinstance(item.metadata, dict):
                         scores.append(item.metadata.get("score"))
             except Exception as e:
-                logger.warning(f"Failed to parse retriever result metadata: {e}")
+                self.__logger.warning(f"Failed to parse retriever result metadata: {e}")
 
-        logger.info(f"Retrieved nodes: {len(retrieved_nodes)}")
+        self.__logger.info(f"Retrieved nodes: {len(retrieved_nodes)}")
         return result, retrieved_nodes, scores, response_time_sec
 
     def __get_interaction_type(self, query: str):
@@ -131,7 +130,7 @@ class SupervisorAgentService:
                 f"Context nodes: {retrieved_nodes[:3]}"
             )
             hint_text = self.__hint_agent.run_sync(hint_prompt).output.strip()
-            logger.info(f"💡 Hint triggered: {hint_reason} → {hint_text}")
+            self.__logger.info(f"💡 Hint triggered: {hint_reason} → {hint_text}")
         else:
             last_trajectories = self.__student_service.get_student_trajectory(
                 student_id, limit=self.__hint_procedural_history_limit
@@ -151,31 +150,31 @@ class SupervisorAgentService:
                     f"Do not reveal exact code; instead, suggest understanding the concept that supports this step."
                 )
                 hint_text = self.__hint_agent.run_sync(hint_prompt).output.strip()
-                logger.info(f"Hint triggered: {hint_reason} → {hint_text}")
+                self.__logger.info(f"Hint triggered: {hint_reason} → {hint_text}")
 
         return hint_triggered, hint_reason, hint_text
 
     def retrieve_context(self, student_id: str, query: str):
         try:
-            logger.info(f"Loading student {student_id} state...")
+            self.__logger.info(f"Loading student {student_id} state...")
             student = self.__student_service.get_student(student_id)
             if not student:
-                logger.warning(f"Student {student_id} not found!")
+                self.__logger.warning(f"Student {student_id} not found!")
                 return None
             if not student.id:
-                logger.warning(f"Student {student_id} has no ID!")
+                self.__logger.warning(f"Student {student_id} has no ID!")
                 return None
 
-            logger.info("Retrieving node metadata...")
+            self.__logger.info("Retrieving node metadata...")
             rag_result, retrieved_nodes, scores, response_time_sec = (
                 self.__retrieve_node_metadata(query)
             )
             node_entry_count = len(retrieved_nodes)
 
-            logger.info("Determining interaction type...")
+            self.__logger.info("Determining interaction type...")
             interaction_type = self.__get_interaction_type(query)
 
-            logger.info("Computing node count and repeat count...")
+            self.__logger.info("Computing node count and repeat count...")
             similar_trajectory_ids = self.__get_student_trajectory_similar_queries(
                 query, student_id=student.id
             )
@@ -202,11 +201,11 @@ class SupervisorAgentService:
                 hint_text=hint_text,
             )
             self.__student_service.add_trajectory_entry(student_id, new_trajectory)
-            logger.info(
+            self.__logger.info(
                 f"✅ Context retrieval logged. ({interaction_type}, {node_entry_count} nodes, {response_time_sec}s)"
             )
             return rag_result
 
         except Exception as e:
-            logger.error(f"Error occurred while retrieving context: {e}")
+            self.__logger.error(f"Error occurred while retrieving context: {e}")
             return None

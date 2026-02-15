@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import uuid
+from datetime import datetime
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, Literal, Self
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class KnowledgeDifficulty(StrEnum):
@@ -108,9 +111,9 @@ class ConceptualKnowledge(BaseChildKnowledge):
         default_factory=list,
         description="List of common misconceptions related to this knowledge, used for providing targeted explanations and hints to students",
     )
-    visibility: set[KnowledgeVisibility] = Field(
-        default_factory=set,
-        description="Set of contexts in which this knowledge should be visible",
+    visibility: list[KnowledgeVisibility] = Field(
+        default_factory=list,
+        description="List of contexts in which this knowledge should be visible",
     )
     validation_status: KnowledgeValidationStatus = Field(
         default=KnowledgeValidationStatus.PENDING,
@@ -142,6 +145,11 @@ class ConceptualKnowledge(BaseChildKnowledge):
         description="List of child nodes in the knowledge graph, used for hierarchical structuring and traversal. Must avoid circular references.",
     )
 
+    @model_validator(mode="after")
+    def validate_visibility(self):
+        self.visibility = list(set(self.visibility))
+        return self
+
     def set_source_recursively(self, source: str):
         self.source = source
         for child in self.children:
@@ -165,10 +173,10 @@ class ProceduralKnowledge(BaseChildKnowledge):
         description="List of common errors or pitfalls related to this procedure, used for providing targeted explanations and hints to students",
         examples=[["Wrong binary path", "Using wrong initialization state"]],
     )
-    visibility: set[KnowledgeVisibility] = Field(
-        default_factory=set,
-        description="Set of contexts in which this knowledge should be visible",
-        examples=[set(e.value for e in KnowledgeVisibility)],
+    visibility: list[KnowledgeVisibility] = Field(
+        default_factory=list,
+        description="List of contexts in which this knowledge should be visible",
+        examples=[list(e.value for e in KnowledgeVisibility)],
     )
     validation_status: KnowledgeValidationStatus = Field(
         default=KnowledgeValidationStatus.PENDING,
@@ -224,10 +232,10 @@ class AssessmentKnowledge(BaseChildKnowledge):
         description="Bloom's taxonomy level for assessment knowledge, used for adaptive learning and providing appropriate explanations and hints to students",
     )
 
-    linked_challenges: set[Any] = Field(
-        default_factory=set,
+    linked_challenges: list[str] = Field(
+        default_factory=list,
         examples=[{"00_angr_find", "01_angr_symbolic_execution"}],
-        description="Set of challenges (e.g. quiz questions, coding exercises) that are linked to this assessment knowledge, used for providing targeted practice opportunities to students",
+        description="List of challenges (e.g. quiz questions, coding exercises) that are linked to this assessment knowledge, used for providing targeted practice opportunities to students",
     )
     objectives: list[str] = Field(
         default_factory=list,
@@ -267,7 +275,7 @@ class RootKnowledge(BaseModel):
     type_: Literal[KnowledgeType.ROOT] = Field(
         default=KnowledgeType.ROOT, alias="type", examples=[KnowledgeType.ROOT]
     )
-    name: Literal["Central node"] = Field("Central node")
+    name: Literal["Central node"] = Field(default="Central node")
     source: str = Field(
         description="Source of the knowledge, such as a textbook, lecture, or external resource. This can be used for traceability and providing additional context to students.",
         examples=["CTF_copy.pdf [page 5]"],
@@ -286,3 +294,38 @@ class RootKnowledge(BaseModel):
 Knowledge = (
     ConceptualKnowledge | ProceduralKnowledge | AssessmentKnowledge | RootKnowledge
 )
+
+
+class KnowledgeUploadStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class KnowledgeUploadRecord(BaseModel):
+    id: str = Field(
+        description="Unique identifier for the upload",
+        default_factory=lambda: uuid.uuid4().hex,
+    )
+    filepath: Path = Field(description="Name of the uploaded file", exclude=True)
+    status: KnowledgeUploadStatus = Field(
+        default=KnowledgeUploadStatus.PENDING,
+        description="Current processing status",
+    )
+    error_message: str | None = Field(
+        default=None, description="Error message if processing failed"
+    )
+    knowledge_id: str | None = Field(
+        default=None, description="ID of the generated knowledge graph"
+    )
+
+    created_at: datetime = Field(description="Timestamp when file was uploaded")
+    updated_at: datetime | None = Field(
+        default=None, description="Timestamp when file was updated"
+    )
+
+    @computed_field
+    @property
+    def filename(self) -> str:
+        return self.filepath.name

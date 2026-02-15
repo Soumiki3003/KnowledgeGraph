@@ -10,6 +10,7 @@ dependencies = [
     "dependency-injector>=4.48.3",
     "flask>=3.1.2",
     "flask-pydantic>=0.14.0",
+    "logfire>=4.22.0",
     "neo4j>=6.1.0",
     "neo4j-graphrag>=1.13.0",
     "opencv-python>=4.13.0.92",
@@ -34,7 +35,5 @@ dev = [
     "langchain-openai>=1.1.7",
     "google-genai>=1.62.0",
     "langchain-ollama>=1.0.1",
+    "debugpy>=1.8.20",
 ]
-
-[project.scripts]
-web = "application.app:main"

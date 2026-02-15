@@ -10,8 +10,9 @@ core:
         formatter: standard
         level: ${LOG_LEVEL:INFO}
     root:
-      handlers: [console]
-      level: ${LOG_LEVEL:INFO}
+      handlers:
+        - console
+      level: ${LOG_LEVEL:DEBUG}
 
   uploads:
     allowed_extensions: ${ALLOWED_EXTENSIONS:pdf,pptx,html}
@@ -19,22 +20,31 @@ core:
 ai:
   agents:
     default:
-      model: "ollama:llama3"
+      model: ${DEFAULT_MODEL:ollama:qwen3:4b}
     knowledge_file:
-      model: "ollama:llama3"
+      model: ${KNOWLEDGE_FILE_MODEL:ollama:qwen3:4b}
     graph:
-      model: "ollama:llama3"
+      model: ${GRAPH_MODEL:ollama:qwen3:4b}
   embedder:
     default:
-      model: "ollama:nomic-embed-text"
+      model: ${EMBEDDER_MODEL:ollama:nomic-embed-text:latest}
 
 gateways:
   rag:
     indexes:
-      trajectory: ${TRAJECTORY_RAG_INDEX_NAME:trajectory_rag_index}
+      trajectory:
+        vector:
+          name: "index_trajectory_query_vector"
+          label: "trajectory_vector"
+        text:
+          name: "index_trajectory_query_text"
+          label: "trajectory_text"
+          fields:
+            - "query"
+            - "interaction_type"
 
   neo4j:
-    uri: ${NEO4J_URI:bolt://localhost:7687}
+    uri: ${NEO4J_URI:neo4j://127.0.0.1:7687}
     user: ${NEO4J_USER:neo4j}
     password: ${NEO4J_PASS:password}
 

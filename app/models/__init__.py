@@ -1,20 +1,22 @@
-from .student import Student, StudentTrajectory
 from .knowledge import (
-    KnowledgeDifficulty,
-    KnowledgeType,
-    KnowledgeConceptualBloomLevel,
-    KnowledgeProceduralBloomLevel,
-    KnowledgeAssessmentBloomLevel,
-    KnowledgeVisibility,
-    KnowledgeConceptualLinkType,
-    ConceptualKnowledgeConnection,
-    KnowledgeValidationStatus,
-    ConceptualKnowledge,
-    ProceduralKnowledge,
     AssessmentKnowledge,
-    RootKnowledge,
+    ConceptualKnowledge,
+    ConceptualKnowledgeConnection,
     Knowledge,
+    KnowledgeAssessmentBloomLevel,
+    KnowledgeConceptualBloomLevel,
+    KnowledgeConceptualLinkType,
+    KnowledgeDifficulty,
+    KnowledgeProceduralBloomLevel,
+    KnowledgeType,
+    KnowledgeUploadRecord,
+    KnowledgeUploadStatus,
+    KnowledgeValidationStatus,
+    KnowledgeVisibility,
+    ProceduralKnowledge,
+    RootKnowledge,
 )
+from .student import Student, StudentTrajectory
 
 __all__ = [
     "Student",
@@ -33,4 +35,6 @@ __all__ = [
     "AssessmentKnowledge",
     "RootKnowledge",
     "Knowledge",
+    "KnowledgeUploadRecord",
+    "KnowledgeUploadStatus",
 ]

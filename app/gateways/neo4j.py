@@ -2,15 +2,20 @@ import asyncio
 import json
 import logging
 from contextlib import contextmanager
-from typing import Self, Sequence
+from typing import Any, Literal, Self, Sequence
 
 from neo4j import Driver, GraphDatabase
 from neo4j_graphrag.embeddings.base import Embedder as EmbedderInterface
+from neo4j_graphrag.generation import GraphRAG
+from neo4j_graphrag.indexes import create_fulltext_index, create_vector_index
 from neo4j_graphrag.llm.base import LLMInterface
 from neo4j_graphrag.llm.types import LLMResponse, ToolCall, ToolCallResponse
 from neo4j_graphrag.message_history import MessageHistory
+from neo4j_graphrag.retrievers import VectorRetriever
 from neo4j_graphrag.tool import Tool
 from neo4j_graphrag.types import LLMMessage
+from neo4j_graphrag.utils.rate_limit import RateLimitHandler
+from pydantic import BaseModel, ConfigDict, PositiveInt
 from pydantic_ai import (
     Agent,
     AgentRunResult,
@@ -25,28 +30,126 @@ from pydantic_ai import (
     UserContent,
     UserPromptPart,
 )
-from pydantic_ai import Tool as PydanticAiTool
-
-logger = logging.getLogger(__name__)
+from pydantic_ai import (
+    Tool as PydanticAiTool,
+)
 
 
 @contextmanager
 def neo4j_driver(uri: str, *, user: str, password: str):
+    logger = logging.getLogger(__name__)
+    logger.info(f"Connecting to Neo4j at {uri} with user {user}")
     auth = (user, password) if user and password else None
-    driver = GraphDatabase.driver(uri, auth=auth)
-    logger.info(f"Connected to Neo4j at {uri} with user {user}")
-    yield driver
-    driver.close()
-    logger.info("Neo4j driver closed")
+    try:
+        driver = GraphDatabase.driver(uri, auth=auth)
+        logger.info(f"Successfully connected to Neo4j at {uri}")
+        yield driver
+    except Exception as e:
+        logger.error(f"Failed to connect to Neo4j at {uri}: {e}")
+        raise
+    else:
+        driver.close()
+        logger.info("Neo4j driver closed")
 
 
 @contextmanager
 def neo4j_session(driver: Driver, **session_kwargs):
-    with driver.session(**session_kwargs) as session:
-        yield session
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Opening Neo4j session with kwargs: {session_kwargs}")
+    try:
+        with driver.session(**session_kwargs) as session:
+            logger.debug("Neo4j session opened successfully")
+            yield session
+    except Exception as e:
+        logger.error(f"Error during Neo4j session: {e}")
+        raise
+    finally:
+        logger.debug("Neo4j session closed")
+
+
+class Neo4jGraphRAGVectorIndexParams(BaseModel):
+    name: str
+    label: str
+    dimension: PositiveInt | None = None
+    field_name: str = "vector"
+    similarity_fn: Literal["euclidean", "cosine"] = "cosine"
+
+
+class Neo4jGraphRAGFulltextIndexParams(BaseModel):
+    name: str
+    label: str
+    node_properties: list[str]
+
+
+class Neo4jGraphRAGParams(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    driver: Driver
+    llm: LLMInterface
+    embedder: EmbedderInterface
+    database: str | None = None
+
+    vector_index: Neo4jGraphRAGVectorIndexParams
+    fulltext_index: Neo4jGraphRAGFulltextIndexParams | None = None
+
+
+def neo4j_graphrag(params: Neo4jGraphRAGParams):
+    logger = logging.getLogger(__name__)
+    logger.info("Initializing Neo4j GraphRAG")
+
+    if params.vector_index.dimension is None:
+        logger.debug("Vector index dimension not specified, auto-detecting...")
+        params.vector_index.dimension = len(
+            params.embedder.embed_query("let me know your dimension")
+        )
+        logger.debug(f"Detected vector dimension: {params.vector_index.dimension}")
+
+    logger.info(f"Creating vector index: {params.vector_index.name}")
+    create_vector_index(
+        params.driver,
+        params.vector_index.name,
+        params.vector_index.label,
+        params.vector_index.field_name,
+        params.vector_index.dimension,
+        params.vector_index.similarity_fn,
+        fail_if_exists=False,
+        neo4j_database=params.database,
+    )
+    logger.info(f"Vector index '{params.vector_index.name}' created/verified")
+
+    if fulltext_index := params.fulltext_index:
+        logger.info(f"Creating fulltext index: {fulltext_index.name}")
+        create_fulltext_index(
+            params.driver,
+            fulltext_index.name,
+            fulltext_index.label,
+            fulltext_index.node_properties,
+            fail_if_exists=False,
+            neo4j_database=params.database,
+        )
+        logger.info(f"Fulltext index '{fulltext_index.name}' created/verified")
+
+    logger.debug("Initializing VectorRetriever")
+    retriever = VectorRetriever(
+        params.driver,
+        params.vector_index.name,
+        params.embedder,
+    )
+    logger.info("Neo4j GraphRAG initialized successfully")
+    return GraphRAG(retriever=retriever, llm=params.llm)
 
 
 class Neo4jAgent(LLMInterface):
+    def __init__(
+        self,
+        model_name: str,
+        model_params: dict[str, Any] | None = None,
+        rate_limit_handler: RateLimitHandler | None = None,
+        **kwargs: Any,
+    ):
+        self.__logger = logging.getLogger(__name__)
+        super().__init__(model_name=model_name, model_params=model_params, **kwargs)
+
     @classmethod
     def from_pydantic_agent(cls, agent: Agent) -> Self:
         if not agent.model:
@@ -112,6 +215,9 @@ class Neo4jAgent(LLMInterface):
         message_history: list[LLMMessage] | MessageHistory | None = None,
         system_instruction: str | None = None,
     ) -> LLMResponse:
+        self.__logger.debug(
+            f"Neo4jAgent ainvoke called with input length: {len(input)}"
+        )
         agent = Agent(
             self.model_name,
             system_prompt=system_instruction or (),
@@ -119,7 +225,11 @@ class Neo4jAgent(LLMInterface):
         )
         parsed_input = [LLMMessage(role="user", content=input)]
 
+        self.__logger.debug("Running agent for ainvoke")
         result = await self.__run_agent(agent, parsed_input, message_history)
+        self.__logger.debug(
+            f"Agent completed, output length: {len(str(result.output))}"
+        )
         return LLMResponse(content=result.output)
 
     async def ainvoke_with_tools(
