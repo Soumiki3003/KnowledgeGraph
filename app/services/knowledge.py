@@ -522,8 +522,8 @@ class KnowledgeService:
         tx: Transaction,
     ) -> models.ConceptualKnowledge:
         # TODO: neo4j.exceptions.CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'child_relation_type': expected '(', 'ALL' or 'ANY' (line 1, column 110 (offset: 109))
-        "MATCH (parent {id: $parent_id}) WHERE parent.type = $parent_type CREATE (n:Concept $props) MERGE (parent)-[:$child_relation_type]->(n) RETURN n"
-                                                                                                                      ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}
+        # "MATCH (parent {id: $parent_id}) WHERE parent.type = $parent_type CREATE (n:Concept $props) MERGE (parent)-[:$child_relation_type]->(n) RETURN n"
+        #                                                                                                               ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}
         query = (
             "MATCH (parent {id: $parent_id}) "
             "WHERE parent.type = $parent_type "
