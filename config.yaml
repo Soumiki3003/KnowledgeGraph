@@ -8,7 +8,7 @@ core:
       console:
         class: logging.StreamHandler
         formatter: standard
-        level: ${LOG_LEVEL:INFO}
+        level: ${LOG_LEVEL:DEBUG}
     root:
       handlers:
         - console
@@ -20,14 +20,14 @@ core:
 ai:
   agents:
     default:
-      model: ${DEFAULT_MODEL:ollama:qwen3:4b}
+      model: ${DEFAULT_MODEL:ollama:qwen3:30b}
     knowledge_file:
-      model: ${KNOWLEDGE_FILE_MODEL:ollama:qwen3:4b}
+      model: ${KNOWLEDGE_FILE_MODEL:ollama:qwen3:30b}
     graph:
-      model: ${GRAPH_MODEL:ollama:qwen3:4b}
+      model: ${GRAPH_MODEL:ollama:qwen3:30b}
   embedder:
     default:
-      model: ${EMBEDDER_MODEL:ollama:nomic-embed-text:latest}
+      model: ${EMBEDDER_MODEL:ollama:qwen3-embedding:8b}
 
 gateways:
   rag:
@@ -48,13 +48,9 @@ gateways:
     user: ${NEO4J_USER:neo4j}
     password: ${NEO4J_PASS:password}
 
-  llm:
-    graph:
-      model: "ollama:llama3"
-
-  embedding:
-    graph:
-      model: "ollama:nomic-embed-text"
+services:
+  knowledge:
+    fake_generation: ${FAKE_GENERATION:false}
 
 flask:
   secret_key: ${SECRET_KEY:dev-secret}

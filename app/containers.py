@@ -108,13 +108,9 @@ class Gateways(containers.DeclarativeContainer):
         agent=ai.graph_agent,
     )
 
-    embedder = providers.Singleton(
-        Embedder,
-        model=config.embedding.graph.model,
-    )
     neo4j_embedder = providers.Singleton(
         gateways.Neo4jEmbedder,
-        embedder=embedder,
+        embedder=ai.default_embedder,
     )
 
     # TODO: Add a prompt template
@@ -157,6 +153,7 @@ class Services(containers.DeclarativeContainer):
         file_service=file,
         upload_service=knowledge_upload,
         static_folder=core.static_folder,
+        fake_generation=config.knowledge.fake_generation.as_(bool),
     )
 
 

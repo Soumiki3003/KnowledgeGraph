@@ -39,7 +39,7 @@ def get_knowledge_system_prompt(env: Environment) -> str:
     )
 
 
-def _get_example_json() -> str:
+def _get_example_json(*, indent: int = 2) -> str:
     """Return an example JSON structure for the knowledge graph."""
     return models.RootKnowledge.model_validate(
         {
@@ -151,4 +151,4 @@ def _get_example_json() -> str:
                 }
             ],
         }
-    ).model_dump_json()
+    ).model_dump_json(ensure_ascii=True, indent=indent)

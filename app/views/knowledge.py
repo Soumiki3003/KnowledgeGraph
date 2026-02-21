@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from dependency_injector.wiring import Provide, inject
 from flask import Blueprint, render_template, request

@@ -149,8 +149,8 @@ class StudentService:
             if offset is not None and offset < 0:
                 raise ValueError("Offset must be a non-negative integer")
 
-            query = """
-            MATCH (s:$student_node_name)-[:$trajectory_rel_name]->(t:$trajectory_node_name)
+            query = f"""
+            MATCH (s:{self.__student_node_name})-[:{self.__trajectory_rel_name}]->(t:{self.__trajectory_node_name})
             WHERE id(s) = $student_id
             """
             params: dict[str, Any] = {}
@@ -161,17 +161,13 @@ class StudentService:
                 query += " SKIP $offset"
                 params["offset"] = offset
             query += (
-                " RETURN t, id(s) AS student_id ORDER BY t.timestamp $timestamp_order"
+                f" RETURN t, id(s) AS student_id ORDER BY t.timestamp {timestamp_order}"
             )
 
             result = tx.run(
                 query,
                 params,
                 student_id=student_id,
-                student_node_name=self.__student_node_name,
-                trajectory_rel_name=self.__trajectory_rel_name,
-                trajectory_node_name=self.__trajectory_node_name,
-                timestamp_order=timestamp_order,
             )
             trajectories = []
             for record in result:
@@ -204,9 +200,9 @@ class StudentService:
             offset: int | None = None,
         ) -> list[models.StudentTrajectory]:
 
-            statement = """
-            MATCH (s:$student_node_name)-[:$trajectory_rel_name]->(t:$trajectory_node_name)
-            WHERE id(s) = $student_id AND t.$trajectory_query_hash_field = $query_hash
+            statement = f"""
+            MATCH (s:{self.__student_node_name})-[:{self.__trajectory_rel_name}]->(t:{self.__trajectory_node_name})
+            WHERE id(s) = $student_id AND t.{self.__trajectory_full_text_index_field} = $query_hash
             """
 
             parameters = {}
@@ -223,10 +219,6 @@ class StudentService:
                 parameters,
                 student_id=student_id,
                 query_hash=hash_string(query),
-                student_node_name=self.__student_node_name,
-                trajectory_rel_name=self.__trajectory_rel_name,
-                trajectory_node_name=self.__trajectory_node_name,
-                trajectory_query_hash_field=self.__trajectory_full_text_index_field,
             )
             trajectories = []
             for record in result:
@@ -279,16 +271,16 @@ class StudentService:
             student_id: str,
             trajectory_entry: models.StudentTrajectory,
         ) -> models.StudentTrajectory:
-            query = """
-            MATCH (s:$student_node_name) WHERE id(s) = $student_id
-            CREATE (t:$trajectory_node_name $props)
-            CREATE (s)-[rel:$trajectory_rel_name]->(t)
+            query = f"""
+            MATCH (s:{self.__student_node_name}) WHERE id(s) = $student_id
+            CREATE (t:{self.__trajectory_node_name} $props)
+            CREATE (s)-[rel:{self.__trajectory_rel_name}]->(t)
             WITH s, t, rel
-            OPTIONAL MATCH (s)-[prev_rel:$trajectory_rel_name]->(prev_t:$trajectory_node_name)
+            OPTIONAL MATCH (s)-[prev_rel:{self.__trajectory_rel_name}]->(prev_t:{self.__trajectory_node_name})
             WHERE prev_t <> t
             ORDER BY prev_t.timestamp DESC
             LIMIT 1
-            CREATE (t)-[:$trajectory_prev_rel_name]->(prev_t)
+            CREATE (t)-[:{self.__trajectory_prev_rel_name}]->(prev_t)
             RETURN t, id(s) AS student_id
             """
 
@@ -306,10 +298,6 @@ class StudentService:
             result = tx.run(
                 query,
                 params,
-                student_node_name=self.__student_node_name,
-                trajectory_node_name=self.__trajectory_node_name,
-                trajectory_rel_name=self.__trajectory_rel_name,
-                trajectory_prev_rel_name=self.__trajectory_prev_rel_name,
                 student_id=student_id,
             )
             node = result.single(strict=True)
@@ -317,20 +305,6 @@ class StudentService:
             data["student_id"] = node["student_id"]
             self.__logger.debug("Trajectory node created successfully")
             return models.StudentTrajectory(**data)
-
-        # create_fulltext_index(
-        #     self.__gateway.driver,
-        #     f"idx-{self.__trajectory_node_name}-{self.__trajectory_query_hash_field}",
-        #     self.__trajectory_node_name,
-        #     [self.__trajectory_query_hash_field],
-        # )
-
-        # create_vector_index(
-        #     self.__gateway.driver,
-        #     f"idx-{self.__trajectory_node_name}-{self.__trajectory_query_vector_field}",
-        #     self.__trajectory_node_name,
-        #     self.__trajectory_query_vector_field,
-        # )
 
         result = self.__session.execute_write(tx_fn, student_id, trajectory_entry)
         self.__logger.info(
@@ -351,14 +325,13 @@ class StudentService:
             trajectory_id: str,
             increment: int,
         ) -> models.StudentTrajectory:
-            query = """
-            MATCH (t:$trajectory_node_name) WHERE id(t) = $trajectory_id
+            query = f"""
+            MATCH (t:{self.__trajectory_node_name}) WHERE id(t) = $trajectory_id
             SET t.query_repeat_count = t.query_repeat_count + $increment
             RETURN t
             """
             result = tx.run(
                 query,
-                trajectory_node_name=self.__trajectory_node_name,
                 trajectory_id=trajectory_id,
                 increment=increment,
             )

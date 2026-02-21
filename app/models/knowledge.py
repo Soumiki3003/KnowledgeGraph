@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Literal, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, computed_field, model_validator
@@ -210,7 +210,7 @@ class ProceduralKnowledge(BaseChildKnowledge):
         examples=[0.0, 50.0, 100.0],
     )
 
-    child: Self | None = Field(
+    child: "Optional[ProceduralKnowledge]" = Field(
         None,
         description="The next step in the procedure, used for structuring the knowledge graph and providing explanations to students. Must avoid circular references.",
     )
