@@ -1,23 +1,16 @@
 from dependency_injector.wiring import Provide, inject
 from flask import Blueprint, render_template, request
 from flask_pydantic import validate
+from pydantic import TypeAdapter, ValidationError
 
 from app import controllers, schemas
 from app.containers import Application
+from app.views.guards import roles_required
+
+_update_node_adapter = TypeAdapter(schemas.UpdateNodeRequest)
+_create_child_adapter = TypeAdapter(schemas.CreateChildNodeRequest)
 
 app = Blueprint("knowledge", __name__)
-
-
-@app.route("/upload", methods=["GET"])
-@inject
-def upload(
-    *,
-    allowed_extensions: list[str] = Provide[Application.core.allowed_extensions],
-):
-    return render_template(
-        "knowledge/upload.html",
-        allowed_extensions=allowed_extensions,
-    )
 
 
 @app.route("/upload/list", methods=["GET"])
@@ -40,32 +33,6 @@ def upload_list(
     )
 
 
-@app.route("/graph", methods=["GET"])
-@validate()
-@inject
-def graph(
-    query: schemas.Paginated,
-    *,
-    knowledge_controller: controllers.KnowledgeController = Provide[
-        Application.controllers.knowledge_controller
-    ],
-):
-    root_nodes_page = knowledge_controller.get_root_nodes(
-        page=query.page,
-        page_size=query.page_size + 1,
-    )
-    has_next = len(root_nodes_page) > query.page_size
-    root_nodes = root_nodes_page[: query.page_size]
-
-    return render_template(
-        "knowledge/graph.html",
-        root_nodes=root_nodes,
-        page=query.page,
-        page_size=query.page_size,
-        has_next=has_next,
-    )
-
-
 @app.route("/graph/data/<knowledge_id>", methods=["GET"])
 @validate(response_by_alias=True)
 @inject
@@ -80,21 +47,93 @@ def graph_data(
     return knowledge
 
 
-@app.route("/upload/submit", methods=["POST"])
-@validate()
+# ── Node operations ──
+
+
+@app.route("/node/<node_id>", methods=["PUT"])
+@roles_required("instructor")
 @inject
-def upload_submit(
+def update_node(
+    node_id: str,
     *,
     knowledge_controller: controllers.KnowledgeController = Provide[
         Application.controllers.knowledge_controller
     ],
 ):
-    files = request.files.getlist("files")
-    html_link = request.form.get("html_link")
+    try:
+        body = _update_node_adapter.validate_python(request.get_json())
+    except ValidationError as e:
+        return {"error": e.errors()}, 422
 
-    if not files:
-        return {"error": "At least one file is required"}, 400
+    try:
+        knowledge_controller.update_node(node_id, body)
+        return {"success": True}, 200
+    except ValueError as e:
+        return {"error": str(e)}, 404
+    except Exception as e:
+        return {"error": str(e)}, 500
 
-    form = schemas.KnowledgeUploadRequest(files=files, html_link=html_link)
-    response = knowledge_controller.parse_uploaded_file_list(form)
-    return response
+
+@app.route("/node/<node_id>", methods=["DELETE"])
+@roles_required("instructor")
+@inject
+def delete_node(
+    node_id: str,
+    *,
+    knowledge_controller: controllers.KnowledgeController = Provide[
+        Application.controllers.knowledge_controller
+    ],
+):
+    course_id = request.args.get("course_id", "")
+    try:
+        knowledge_controller.delete_node(node_id, course_id)
+        return {"success": True}, 200
+    except ValueError as e:
+        return {"error": str(e)}, 404
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@app.route("/node/<parent_id>/child", methods=["POST"])
+@roles_required("instructor")
+@inject
+def add_child_node(
+    parent_id: str,
+    *,
+    knowledge_controller: controllers.KnowledgeController = Provide[
+        Application.controllers.knowledge_controller
+    ],
+):
+    try:
+        body = _create_child_adapter.validate_python(request.get_json())
+    except ValidationError as e:
+        return {"error": e.errors()}, 422
+
+    try:
+        new_id = knowledge_controller.add_child_node(parent_id, body)
+        return {"success": True, "id": new_id}, 201
+    except ValueError as e:
+        return {"error": str(e)}, 400
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@app.route("/node/<node_id>/relationship", methods=["POST"])
+@roles_required("instructor")
+@validate()
+@inject
+def add_relationship(
+    node_id: str,
+    body: schemas.CreateRelationshipRequest,
+    *,
+    knowledge_controller: controllers.KnowledgeController = Provide[
+        Application.controllers.knowledge_controller
+    ],
+):
+    try:
+        knowledge_controller.add_relationship(node_id, body)
+        return {"success": True}, 201
+    except ValueError as e:
+        return {"error": str(e)}, 400
+    except Exception as e:
+        return {"error": str(e)}, 500

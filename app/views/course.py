@@ -4,6 +4,7 @@ from flask_login import current_user, login_required
 from flask_pydantic import validate
 
 from app import controllers, schemas
+from app.schemas.knowledge import ALLOWED_CHILDREN, BLOOM_LEVELS
 from app.containers import Application
 from app.views.guards import roles_required
 
@@ -45,7 +46,7 @@ def create_course(
         Application.controllers.course_controller
     ],
 ):
-    course_id = course_controller.create_course(form.name, form.description)
+    course_id = course_controller.create_course(form)
     return {"id": course_id, "redirect": "/"}, 201
 
 
@@ -115,6 +116,8 @@ def settings(
         course_id=course_id,
         uploads=uploads,
         allowed_extensions=allowed_extensions,
+        allowed_children=ALLOWED_CHILDREN,
+        bloom_levels=BLOOM_LEVELS,
     )
 
 

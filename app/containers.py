@@ -174,7 +174,6 @@ class Controllers(containers.DeclarativeContainer):
 
     knowledge_controller = providers.Factory(
         controllers.KnowledgeController,
-        uploads_folder=core.uploads_folder,
         knowledge_service=services.knowledge,
         uploads_service=services.knowledge_upload,
     )

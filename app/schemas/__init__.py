@@ -1,8 +1,19 @@
 from .user import CreateUser, UpdateUser
 from .knowledge import (
-    KnowledgeUploadRequest,
-    KnowledgeUploadResponse,
     KnowledgeRootNode,
+    UpdateNodeRequest,
+    UpdateRootNodeRequest,
+    UpdateConceptualNodeRequest,
+    UpdateProceduralNodeRequest,
+    UpdateAssessmentNodeRequest,
+    CreateChildNodeRequest,
+    CreateConceptualNodeRequest,
+    CreateProceduralNodeRequest,
+    CreateAssessmentNodeRequest,
+    CreateRelationshipRequest,
+    DeleteNodeRequest,
+    ALLOWED_CHILDREN,
+    BLOOM_LEVELS,
 )
 from .file import (
     PaginatedTextualContent,
@@ -18,8 +29,6 @@ from .course import CreateCourse, ChatUserMessageFormRequest
 __all__ = [
     "CreateUser",
     "UpdateUser",
-    "KnowledgeUploadRequest",
-    "KnowledgeUploadResponse",
     "KnowledgeRootNode",
     "PaginatedTextualContent",
     "SlideTextualContent",
@@ -29,4 +38,17 @@ __all__ = [
     "LoginRequest",
     "CreateCourse",
     "ChatUserMessageFormRequest",
+    "UpdateNodeRequest",
+    "UpdateRootNodeRequest",
+    "UpdateConceptualNodeRequest",
+    "UpdateProceduralNodeRequest",
+    "UpdateAssessmentNodeRequest",
+    "CreateChildNodeRequest",
+    "CreateConceptualNodeRequest",
+    "CreateProceduralNodeRequest",
+    "CreateAssessmentNodeRequest",
+    "CreateRelationshipRequest",
+    "DeleteNodeRequest",
+    "ALLOWED_CHILDREN",
+    "BLOOM_LEVELS",
 ]

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from contextlib import AbstractContextManager
 from typing import Callable
+from uuid import uuid4
 
 import jinja2
 import pydantic_ai
@@ -756,3 +757,147 @@ class KnowledgeService:
                 )
 
         return created_root.id
+
+    def update_node(self, node_id: str, updates: dict) -> None:
+        """Update properties of a single node (any type)."""
+        self.__logger.info(f"Updating node {node_id} with {list(updates.keys())}")
+
+        props = {k: v for k, v in updates.items() if v is not None}
+        if not props:
+            return
+
+        @unit_of_work()
+        def txn_fn(tx: ManagedTransaction, *, node_id: str, props: dict) -> None:
+            check = tx.run("MATCH (n {id: $id}) RETURN n.type AS type", id=node_id)
+            if not check.single():
+                raise ValueError(f"Node with ID '{node_id}' not found")
+
+            tx.run("MATCH (n {id: $id}) SET n += $props", id=node_id, props=props)
+
+        with self.__session_factory() as session:
+            session.execute_write(txn_fn, node_id=node_id, props=props)
+
+        self.__logger.info(f"Node {node_id} updated successfully")
+
+    def delete_node(self, node_id: str, course_id: str) -> None:
+        """Delete a node and its entire subtr ee. Cannot delete root nodes."""
+        self.__logger.info(
+            f"Deleting node {node_id} (and subtree) from course {course_id}"
+        )
+        child_rel = self.__child_relation_type
+
+        @unit_of_work()
+        def txn_fn(tx: ManagedTransaction, *, node_id: str) -> None:
+            check = tx.run("MATCH (n {id: $id}) RETURN n.type AS type", id=node_id)
+            record = check.single()
+            if not record:
+                raise ValueError(f"Node with ID '{node_id}' not found")
+            if record["type"] == models.KnowledgeType.ROOT.value:
+                raise ValueError(
+                    "Cannot delete root node via this endpoint. "
+                    "Use delete_course instead."
+                )
+
+            tx.run(
+                f"MATCH (n {{id: $id}})-[:{child_rel}*1..]->(desc) DETACH DELETE desc",
+                id=node_id,
+            )
+            tx.run("MATCH (n {id: $id}) DETACH DELETE n", id=node_id)
+
+        with self.__session_factory() as session:
+            session.execute_write(txn_fn, node_id=node_id)
+
+        self.__logger.info(f"Node {node_id} deleted successfully")
+
+    def add_child_node(
+        self,
+        parent_id: str,
+        child_type: str,
+        props: dict,
+    ) -> str:
+        """Create a new child node under the given parent and return its ID."""
+        node_id = str(uuid4())
+        props["id"] = node_id
+        props["type"] = child_type
+        self.__logger.info(f"Adding {child_type} child node under parent {parent_id}")
+        child_rel = self.__child_relation_type
+
+        @unit_of_work()
+        def txn_fn(
+            tx: ManagedTransaction,
+            *,
+            parent_id: str,
+            child_type: str,
+            props: dict,
+        ) -> None:
+            check = tx.run("MATCH (p {id: $id}) RETURN p.type AS type", id=parent_id)
+            record = check.single()
+            if not record:
+                raise ValueError(f"Parent node with ID '{parent_id}' not found")
+
+            parent_type = record["type"]
+            valid_children: dict[str, list[str]] = {
+                models.KnowledgeType.ROOT.value: [
+                    models.KnowledgeType.CONCEPTUAL.value
+                ],
+                models.KnowledgeType.CONCEPTUAL.value: [
+                    models.KnowledgeType.PROCEDURAL.value,
+                    models.KnowledgeType.ASSESSMENT.value,
+                ],
+                models.KnowledgeType.PROCEDURAL.value: [
+                    models.KnowledgeType.PROCEDURAL.value
+                ],
+            }
+            allowed = valid_children.get(parent_type, [])
+            if child_type not in allowed:
+                raise ValueError(
+                    f"Cannot add {child_type} child to {parent_type} parent. "
+                    f"Allowed: {allowed}"
+                )
+
+            tx.run(
+                "MATCH (p {id: $parent_id}) "
+                "CREATE (n $props) "
+                f"MERGE (p)-[:{child_rel}]->(n)",
+                parent_id=parent_id,
+                props=props,
+            )
+
+        with self.__session_factory() as session:
+            session.execute_write(
+                txn_fn, parent_id=parent_id, child_type=child_type, props=props
+            )
+
+        self.__logger.info(f"Child node {node_id} created successfully")
+        return node_id
+
+    def add_relationship(self, from_id: str, to_id: str, relation: str) -> None:
+        """Add a conceptual relationship between two existing nodes."""
+        self.__logger.info(f"Adding relationship {from_id} -[{relation}]-> {to_id}")
+
+        allowed = {r.value for r in models.KnowledgeConceptualLinkType}
+        if relation not in allowed:
+            raise ValueError(f"Invalid relation type '{relation}'. Allowed: {allowed}")
+
+        @unit_of_work()
+        def txn_fn(
+            tx: ManagedTransaction, *, from_id: str, to_id: str, relation: str
+        ) -> None:
+            for nid in (from_id, to_id):
+                check = tx.run("MATCH (n {id: $id}) RETURN n.id", id=nid)
+                if not check.single():
+                    raise ValueError(f"Node with ID '{nid}' not found")
+
+            tx.run(
+                f"MATCH (a {{id: $from_id}}), (b {{id: $to_id}}) "
+                f"MERGE (a)-[:{relation}]->(b)",
+                from_id=from_id,
+                to_id=to_id,
+            )
+
+        with self.__session_factory() as session:
+            session.execute_write(
+                txn_fn, from_id=from_id, to_id=to_id, relation=relation
+            )
+
+        self.__logger.info(f"Relationship {relation} created successfully")

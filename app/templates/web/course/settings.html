@@ -121,19 +121,19 @@
                 <!-- Action buttons -->
                 <div class="divider my-2"></div>
                 <div class="space-y-2">
-                    <button id="action-edit" class="btn btn-sm btn-outline btn-block justify-start gap-2" onclick="showToast('Edit node — coming soon')">
+                    <button id="action-edit" class="btn btn-sm btn-outline btn-block justify-start gap-2" onclick="openEditModal()">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         Edit Node
                     </button>
-                    <button id="action-add-child" class="btn btn-sm btn-outline btn-primary btn-block justify-start gap-2" onclick="showToast('Add child node — coming soon')">
+                    <button id="action-add-child" class="btn btn-sm btn-outline btn-primary btn-block justify-start gap-2" onclick="openAddChildModal()">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         Add Child Node
                     </button>
-                    <button id="action-add-rel" class="btn btn-sm btn-outline btn-secondary btn-block justify-start gap-2" onclick="showToast('Add relationship — coming soon')">
+                    <button id="action-add-rel" class="btn btn-sm btn-outline btn-secondary btn-block justify-start gap-2" onclick="openAddRelModal()">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
                         Add Relationship
                     </button>
-                    <button id="action-delete" class="btn btn-sm btn-outline btn-error btn-block justify-start gap-2" onclick="showToast('Delete node — coming soon')">
+                    <button id="action-delete" class="btn btn-sm btn-outline btn-error btn-block justify-start gap-2" onclick="openDeleteNodeModal()">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         Delete Node
                     </button>
@@ -145,6 +145,121 @@
     <!-- Status bar -->
     <div id="graph-status" class="mt-2 text-sm text-base-content/60 text-center shrink-0"></div>
 </div>
+
+<!-- Edit Node Modal -->
+<dialog id="edit-node-modal" class="modal">
+    <div class="modal-box max-w-lg">
+        <h3 class="font-bold text-lg mb-4">Edit Node</h3>
+        <form id="edit-node-form" class="space-y-3">
+            <div class="form-control">
+                <label class="label"><span class="label-text">Name</span></label>
+                <input name="name" type="text" class="input input-bordered input-sm w-full">
+            </div>
+            <div id="edit-common-fields"></div>
+            <div id="edit-extra-fields"></div>
+            <div class="modal-action">
+                <form method="dialog"><button class="btn btn-sm">Cancel</button></form>
+                <button type="submit" class="btn btn-sm btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Add Child Node Modal -->
+<dialog id="add-child-modal" class="modal">
+    <div class="modal-box max-w-lg">
+        <h3 class="font-bold text-lg mb-4">Add Child Node</h3>
+        <form id="add-child-form" class="space-y-3">
+            <div class="form-control">
+                <label class="label"><span class="label-text">Type</span></label>
+                <select name="type" class="select select-bordered select-sm w-full" required id="add-child-type">
+                    <option value="conceptual">Conceptual</option>
+                    <option value="procedural">Procedural</option>
+                    <option value="assessment">Assessment</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text">Name</span></label>
+                <input name="name" type="text" class="input input-bordered input-sm w-full" required>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text">Label</span></label>
+                <input name="label" type="text" class="input input-bordered input-sm w-full" required>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text">Difficulty</span></label>
+                <select name="difficulty" class="select select-bordered select-sm w-full">
+                    <option value="easy">Easy</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text">Bloom Level</span></label>
+                <select name="bloom_level" class="select select-bordered select-sm w-full" id="add-child-bloom">
+                    <option value="remember">Remember</option>
+                    <option value="understand">Understand</option>
+                    <option value="apply">Apply</option>
+                    <option value="analyze">Analyze</option>
+                    <option value="evaluate">Evaluate</option>
+                    <option value="create">Create</option>
+                </select>
+            </div>
+            <div id="add-child-extra-fields"></div>
+            <div class="modal-action">
+                <form method="dialog"><button class="btn btn-sm">Cancel</button></form>
+                <button type="submit" class="btn btn-sm btn-primary">Create Node</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Add Relationship Modal -->
+<dialog id="add-rel-modal" class="modal">
+    <div class="modal-box max-w-lg">
+        <h3 class="font-bold text-lg mb-4">Add Relationship</h3>
+        <form id="add-rel-form" class="space-y-3">
+            <div class="form-control">
+                <label class="label"><span class="label-text">Target Node</span></label>
+                <select name="to_id" class="select select-bordered select-sm w-full" required id="rel-target-select">
+                    <!-- populated dynamically -->
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text">Relation Type</span></label>
+                <select name="relation" class="select select-bordered select-sm w-full" required>
+                    <option value="PREREQUISITE_FOR">PREREQUISITE_FOR</option>
+                    <option value="DEPENDS_ON">DEPENDS_ON</option>
+                    <option value="EXTENDS_TO">EXTENDS_TO</option>
+                    <option value="GENERALIZES_TO">GENERALIZES_TO</option>
+                    <option value="USES_INIT_FROM">USES_INIT_FROM</option>
+                    <option value="IMPLEMENTED_BY">IMPLEMENTED_BY</option>
+                    <option value="ENABLES">ENABLES</option>
+                </select>
+            </div>
+            <div class="modal-action">
+                <form method="dialog"><button class="btn btn-sm">Cancel</button></form>
+                <button type="submit" class="btn btn-sm btn-secondary">Create Relationship</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Delete Node Modal -->
+<dialog id="delete-node-modal" class="modal">
+    <div class="modal-box border border-error">
+        <h3 class="font-bold text-lg text-error">Delete Node</h3>
+        <p class="py-4">This will delete <strong id="delete-node-name"></strong> and all its child nodes. This action cannot be undone.</p>
+        <div class="modal-action">
+            <form method="dialog"><button class="btn btn-sm">Cancel</button></form>
+            <button class="btn btn-sm btn-error" onclick="deleteNode()">Delete Node</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 <!-- Tab: Upload Materials -->
 <div id="tab-upload" class="settings-panel hidden">
@@ -360,6 +475,7 @@
     };
     let g6Graph = null;
     let allNodesRaw = {}; // id -> raw node data for detail panel
+    let selectedNodeId = null;
 
     function normalizeType(t) { return String(t || 'root').toLowerCase(); }
 
@@ -503,6 +619,7 @@
     document.getElementById('detail-close').addEventListener('click', hideNodeDetail);
 
     function hideNodeDetail() {
+        selectedNodeId = null;
         detailPanel.classList.add('hidden');
         if (g6Graph) {
             g6Graph.getNodes().forEach(n => g6Graph.clearItemStates(n));
@@ -512,6 +629,7 @@
     function showNodeDetail(nodeId) {
         const raw = allNodesRaw[nodeId];
         if (!raw) return;
+        selectedNodeId = nodeId;
 
         // Highlight selected node
         if (g6Graph) {
@@ -538,8 +656,6 @@
             }
             html += '<div><span class="font-medium text-base-content/70">' + label + ':</span> ' + escHtml(String(val)) + '</div>';
         }
-
-        function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
         field('ID', raw.id);
         if (t === 'conceptual') {
@@ -606,6 +722,259 @@
             statusEl.textContent = 'No graph data yet — upload materials to generate the knowledge graph.';
         }
     }
+
+    /* ── Helper: JSON fetch wrapper ── */
+    async function jsonFetch(url, method, body) {
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Request failed');
+        return data;
+    }
+
+    /* ── Server-provided type mappings ── */
+    const allowedChildren = {{ allowed_children | tojson }};
+    const bloomLevels = {{ bloom_levels | tojson }};
+
+    function buildBloomSelect(name, type, currentValue) {
+        const levels = bloomLevels[type] || [];
+        if (!levels.length) return '';
+        let html = '<div class="form-control"><label class="label"><span class="label-text">Bloom Level</span></label>'
+            + '<select name="' + name + '" class="select select-bordered select-sm w-full">';
+        levels.forEach(lvl => {
+            const label = lvl.charAt(0).toUpperCase() + lvl.slice(1);
+            html += '<option value="' + lvl + '"' + (lvl === currentValue ? ' selected' : '') + '>' + label + '</option>';
+        });
+        html += '</select></div>';
+        return html;
+    }
+
+    /* ── Edit Node ── */
+    function openEditModal() {
+        if (!selectedNodeId) return;
+        const raw = allNodesRaw[selectedNodeId];
+        if (!raw) return;
+
+        const form = document.getElementById('edit-node-form');
+        form.reset();
+        form.name.value = raw.name || '';
+
+        const t = normalizeType(raw.type);
+
+        // Common fields (label + difficulty) for non-root types
+        let common = '';
+        if (t !== 'root') {
+            common += '<div class="form-control"><label class="label"><span class="label-text">Label</span></label>'
+                + '<input name="label" type="text" class="input input-bordered input-sm w-full" value="' + escHtml(raw.label || '') + '"></div>';
+            common += '<div class="form-control"><label class="label"><span class="label-text">Difficulty</span></label>'
+                + '<select name="difficulty" class="select select-bordered select-sm w-full">'
+                + '<option value="">-- keep current --</option>'
+                + '<option value="easy"' + (raw.difficulty === 'easy' ? ' selected' : '') + '>Easy</option>'
+                + '<option value="medium"' + (raw.difficulty === 'medium' ? ' selected' : '') + '>Medium</option>'
+                + '<option value="hard"' + (raw.difficulty === 'hard' ? ' selected' : '') + '>Hard</option>'
+                + '</select></div>';
+        }
+        document.getElementById('edit-common-fields').innerHTML = common;
+
+        // Type-specific fields
+        let extra = '';
+        if (t === 'conceptual') {
+            extra += buildBloomSelect('bloom_level', t, raw.bloom_level);
+            extra += '<div class="form-control"><label class="label"><span class="label-text">Definition</span></label>'
+                + '<textarea name="definition" class="textarea textarea-bordered textarea-sm w-full" rows="2">' + escHtml(raw.definition || '') + '</textarea></div>';
+            extra += '<div class="form-control"><label class="label"><span class="label-text">Learning Objective</span></label>'
+                + '<input name="learning_objective" type="text" class="input input-bordered input-sm w-full" value="' + escHtml(raw.learning_objective || '') + '"></div>';
+        } else if (t === 'procedural') {
+            extra += buildBloomSelect('bloom_level', t, raw.bloom_level);
+            extra += '<div class="form-control"><label class="label"><span class="label-text">Progress (%)</span></label>'
+                + '<input name="percent_done" type="number" min="0" max="100" class="input input-bordered input-sm w-full" value="' + (raw.percent_done || 0) + '"></div>';
+        } else if (t === 'assessment') {
+            extra += buildBloomSelect('bloom_level', t, raw.bloom_level);
+        } else if (t === 'root') {
+            extra += '<div class="form-control"><label class="label"><span class="label-text">Description</span></label>'
+                + '<textarea name="description" class="textarea textarea-bordered textarea-sm w-full" rows="2">' + escHtml(raw.description || '') + '</textarea></div>';
+        }
+        document.getElementById('edit-extra-fields').innerHTML = extra;
+        document.getElementById('edit-node-modal').showModal();
+    }
+
+    document.getElementById('edit-node-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (!selectedNodeId) return;
+        const raw = allNodesRaw[selectedNodeId];
+        if (!raw) return;
+
+        const formData = new FormData(this);
+        const body = { type: normalizeType(raw.type) };
+        for (const [k, v] of formData.entries()) {
+            if (v !== '' && v !== null) {
+                body[k] = k === 'percent_done' ? parseFloat(v) : v;
+            }
+        }
+        try {
+            await jsonFetch('/knowledge/node/' + encodeURIComponent(selectedNodeId), 'PUT', body);
+            document.getElementById('edit-node-modal').close();
+            showToast('Node updated successfully.', 'success');
+            loadCourseGraph();
+        } catch (err) {
+            showToast('Error updating node: ' + err.message, 'error');
+        }
+    });
+
+    /* ── Add Child Node ── */
+    function openAddChildModal() {
+        if (!selectedNodeId) return;
+        const raw = allNodesRaw[selectedNodeId];
+        if (!raw) return;
+
+        const t = normalizeType(raw.type);
+        const typeSelect = document.getElementById('add-child-type');
+        const childTypes = allowedChildren[t] || [];
+
+        if (!childTypes.length) {
+            showToast('This node type cannot have children.', 'warning');
+            return;
+        }
+
+        typeSelect.innerHTML = '';
+        childTypes.forEach(val => {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = val.charAt(0).toUpperCase() + val.slice(1);
+            typeSelect.appendChild(opt);
+        });
+
+        document.getElementById('add-child-form').reset();
+        typeSelect.value = childTypes[0];
+        updateBloomOptions();
+        updateCreateExtraFields();
+        document.getElementById('add-child-modal').showModal();
+    }
+
+    function updateBloomOptions() {
+        const type = document.getElementById('add-child-type').value;
+        const bloomSelect = document.getElementById('add-child-bloom');
+        const levels = bloomLevels[type] || [];
+        bloomSelect.innerHTML = '';
+        levels.forEach(val => {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = val.charAt(0).toUpperCase() + val.slice(1);
+            bloomSelect.appendChild(opt);
+        });
+    }
+
+    function updateCreateExtraFields() {
+        const type = document.getElementById('add-child-type').value;
+        const container = document.getElementById('add-child-extra-fields');
+        let extra = '';
+        if (type === 'conceptual') {
+            extra += '<div class="form-control"><label class="label"><span class="label-text">Definition</span></label>'
+                + '<textarea name="definition" class="textarea textarea-bordered textarea-sm w-full" rows="2"></textarea></div>';
+            extra += '<div class="form-control"><label class="label"><span class="label-text">Learning Objective</span></label>'
+                + '<input name="learning_objective" type="text" class="input input-bordered input-sm w-full"></div>';
+        } else if (type === 'procedural') {
+            extra += '<div class="form-control"><label class="label"><span class="label-text">Learning Objective</span></label>'
+                + '<input name="learning_objective" type="text" class="input input-bordered input-sm w-full"></div>';
+            extra += '<div class="form-control"><label class="label"><span class="label-text">Progress (%)</span></label>'
+                + '<input name="percent_done" type="number" min="0" max="100" value="0" class="input input-bordered input-sm w-full"></div>';
+        }
+        container.innerHTML = extra;
+    }
+
+    document.getElementById('add-child-type').addEventListener('change', () => {
+        updateBloomOptions();
+        updateCreateExtraFields();
+    });
+
+    document.getElementById('add-child-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const body = {};
+        for (const [k, v] of formData.entries()) {
+            if (v !== '' && v !== null) {
+                body[k] = k === 'percent_done' ? parseFloat(v) : v;
+            }
+        }
+        try {
+            const result = await jsonFetch(
+                '/knowledge/node/' + encodeURIComponent(selectedNodeId) + '/child',
+                'POST', body
+            );
+            document.getElementById('add-child-modal').close();
+            showToast('Child node created.', 'success');
+            loadCourseGraph();
+        } catch (err) {
+            showToast('Error creating child: ' + err.message, 'error');
+        }
+    });
+
+    /* ── Add Relationship ── */
+    function openAddRelModal() {
+        if (!selectedNodeId) return;
+        const select = document.getElementById('rel-target-select');
+        select.innerHTML = '';
+        // Populate with all nodes except the selected one
+        Object.values(allNodesRaw).forEach(n => {
+            if (n.id === selectedNodeId) return;
+            const opt = document.createElement('option');
+            opt.value = n.id;
+            opt.textContent = (n.label || n.name || n.id) + ' (' + normalizeType(n.type) + ')';
+            select.appendChild(opt);
+        });
+        document.getElementById('add-rel-form').reset();
+        document.getElementById('add-rel-modal').showModal();
+    }
+
+    document.getElementById('add-rel-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const body = { to_id: formData.get('to_id'), relation: formData.get('relation') };
+        try {
+            await jsonFetch(
+                '/knowledge/node/' + encodeURIComponent(selectedNodeId) + '/relationship',
+                'POST', body
+            );
+            document.getElementById('add-rel-modal').close();
+            showToast('Relationship created.', 'success');
+            loadCourseGraph();
+        } catch (err) {
+            showToast('Error creating relationship: ' + err.message, 'error');
+        }
+    });
+
+    /* ── Delete Node ── */
+    function openDeleteNodeModal() {
+        if (!selectedNodeId) return;
+        const raw = allNodesRaw[selectedNodeId];
+        if (!raw) return;
+        if (normalizeType(raw.type) === 'root') {
+            showToast('Cannot delete root node. Use "Delete Course" instead.', 'warning');
+            return;
+        }
+        document.getElementById('delete-node-name').textContent = '"' + (raw.label || raw.name || raw.id) + '"';
+        document.getElementById('delete-node-modal').showModal();
+    }
+
+    async function deleteNode() {
+        document.getElementById('delete-node-modal').close();
+        try {
+            await jsonFetch(
+                '/knowledge/node/' + encodeURIComponent(selectedNodeId) + '?course_id=' + encodeURIComponent(courseId),
+                'DELETE', null
+            );
+            showToast('Node deleted.', 'success');
+            hideNodeDetail();
+            loadCourseGraph();
+        } catch (err) {
+            showToast('Error deleting node: ' + err.message, 'error');
+        }
+    }
+
+    function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     loadCourseGraph();
 </script>

@@ -43,7 +43,7 @@
             <td>
                 {% if upload.knowledge_id %}
                 <a
-                    href="{{ url_for('knowledge.graph', knowledge_id=upload.knowledge_id) }}"
+                    href="{{ url_for('course.settings', course_id=upload.knowledge_id) }}#graph"
                     class="btn btn-xs btn-primary"
                     >View Graph</a
                 >
