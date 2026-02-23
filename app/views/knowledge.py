@@ -137,3 +137,45 @@ def add_relationship(
         return {"error": str(e)}, 400
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+@app.route("/node/<node_id>/relationship", methods=["PUT"])
+@roles_required("instructor")
+@validate()
+@inject
+def update_relationship(
+    node_id: str,
+    body: schemas.UpdateRelationshipRequest,
+    *,
+    knowledge_controller: controllers.KnowledgeController = Provide[
+        Application.controllers.knowledge_controller
+    ],
+):
+    try:
+        knowledge_controller.update_relationship(node_id, body)
+        return {"success": True}, 200
+    except ValueError as e:
+        return {"error": str(e)}, 400
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@app.route("/node/<node_id>/relationship", methods=["DELETE"])
+@roles_required("instructor")
+@validate()
+@inject
+def delete_relationship(
+    node_id: str,
+    body: schemas.DeleteRelationshipRequest,
+    *,
+    knowledge_controller: controllers.KnowledgeController = Provide[
+        Application.controllers.knowledge_controller
+    ],
+):
+    try:
+        knowledge_controller.delete_relationship(node_id, body)
+        return {"success": True}, 200
+    except ValueError as e:
+        return {"error": str(e)}, 400
+    except Exception as e:
+        return {"error": str(e)}, 500

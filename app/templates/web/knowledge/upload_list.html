@@ -42,10 +42,10 @@
             </td>
             <td>
                 {% if upload.knowledge_id %}
-                <a
-                    href="{{ url_for('course.settings', course_id=upload.knowledge_id) }}#graph"
+                <button
                     class="btn btn-xs btn-primary"
-                    >View Graph</a
+                    onclick="document.querySelector('#settings-tabs .tab[data-tab=&quot;graph&quot;]').click()"
+                    >View Graph</button
                 >
                 {% else %}
                 <span class="text-xs opacity-50">Waiting</span>

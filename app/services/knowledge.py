@@ -901,3 +901,85 @@ class KnowledgeService:
             )
 
         self.__logger.info(f"Relationship {relation} created successfully")
+
+    def update_relationship(
+        self, from_id: str, to_id: str, old_relation: str, new_relation: str
+    ) -> None:
+        """Change the type of an existing conceptual relationship."""
+        self.__logger.info(
+            f"Updating relationship {from_id} -[{old_relation}]-> {to_id} to {new_relation}"
+        )
+
+        allowed = {r.value for r in models.KnowledgeConceptualLinkType}
+        for rel in (old_relation, new_relation):
+            if rel not in allowed:
+                raise ValueError(f"Invalid relation type '{rel}'. Allowed: {allowed}")
+
+        @unit_of_work()
+        def txn_fn(
+            tx: ManagedTransaction,
+            *,
+            from_id: str,
+            to_id: str,
+            old_relation: str,
+            new_relation: str,
+        ) -> None:
+            for nid in (from_id, to_id):
+                check = tx.run("MATCH (n {id: $id}) RETURN n.id", id=nid)
+                if not check.single():
+                    raise ValueError(f"Node with ID '{nid}' not found")
+
+            tx.run(
+                f"MATCH (a {{id: $from_id}})-[r:{old_relation}]->(b {{id: $to_id}}) "
+                "DELETE r",
+                from_id=from_id,
+                to_id=to_id,
+            )
+            tx.run(
+                f"MATCH (a {{id: $from_id}}), (b {{id: $to_id}}) "
+                f"MERGE (a)-[:{new_relation}]->(b)",
+                from_id=from_id,
+                to_id=to_id,
+            )
+
+        with self.__session_factory() as session:
+            session.execute_write(
+                txn_fn,
+                from_id=from_id,
+                to_id=to_id,
+                old_relation=old_relation,
+                new_relation=new_relation,
+            )
+
+        self.__logger.info(f"Relationship updated to {new_relation} successfully")
+
+    def delete_relationship(self, from_id: str, to_id: str, relation: str) -> None:
+        """Delete a conceptual relationship between two existing nodes."""
+        self.__logger.info(f"Deleting relationship {from_id} -[{relation}]-> {to_id}")
+
+        allowed = {r.value for r in models.KnowledgeConceptualLinkType}
+        if relation not in allowed:
+            raise ValueError(f"Invalid relation type '{relation}'. Allowed: {allowed}")
+
+        @unit_of_work()
+        def txn_fn(
+            tx: ManagedTransaction, *, from_id: str, to_id: str, relation: str
+        ) -> None:
+            for nid in (from_id, to_id):
+                check = tx.run("MATCH (n {id: $id}) RETURN n.id", id=nid)
+                if not check.single():
+                    raise ValueError(f"Node with ID '{nid}' not found")
+
+            tx.run(
+                f"MATCH (a {{id: $from_id}})-[r:{relation}]->(b {{id: $to_id}}) "
+                "DELETE r",
+                from_id=from_id,
+                to_id=to_id,
+            )
+
+        with self.__session_factory() as session:
+            session.execute_write(
+                txn_fn, from_id=from_id, to_id=to_id, relation=relation
+            )
+
+        self.__logger.info(f"Relationship {relation} deleted successfully")

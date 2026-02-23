@@ -181,6 +181,21 @@ class CreateRelationshipRequest(BaseModel):
     relation: models.KnowledgeConceptualLinkType
 
 
+class UpdateRelationshipRequest(BaseModel):
+    """Update the type of an existing conceptual relationship."""
+
+    to_id: str = Field(min_length=1, description="Target node ID")
+    old_relation: models.KnowledgeConceptualLinkType
+    new_relation: models.KnowledgeConceptualLinkType
+
+
+class DeleteRelationshipRequest(BaseModel):
+    """Delete a conceptual relationship between two nodes."""
+
+    to_id: str = Field(min_length=1, description="Target node ID")
+    relation: models.KnowledgeConceptualLinkType
+
+
 class DeleteNodeRequest(BaseModel):
     """Delete a node and its subtree from a course."""
 

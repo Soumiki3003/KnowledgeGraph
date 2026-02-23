@@ -69,3 +69,17 @@ class KnowledgeController:
         self.__knowledge_service.add_relationship(
             node_id, form.to_id, form.relation.value
         )
+
+    def update_relationship(
+        self, node_id: str, form: schemas.UpdateRelationshipRequest
+    ) -> None:
+        self.__knowledge_service.update_relationship(
+            node_id, form.to_id, form.old_relation.value, form.new_relation.value
+        )
+
+    def delete_relationship(
+        self, node_id: str, form: schemas.DeleteRelationshipRequest
+    ) -> None:
+        self.__knowledge_service.delete_relationship(
+            node_id, form.to_id, form.relation.value
+        )

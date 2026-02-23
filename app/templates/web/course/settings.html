@@ -1,6 +1,8 @@
 {% extends "base_app.html" %}
 {% block title %}Settings - {{ course.name }} - KnowledgeGraph{% endblock %}
 
+{% block main_class %}w-full{% endblock %}
+
 {% block breadcrumb %}
 <div class="breadcrumbs text-sm">
     <ul>
@@ -261,6 +263,51 @@
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
+<!-- Edit Relationship Modal -->
+<dialog id="edit-rel-modal" class="modal">
+    <div class="modal-box max-w-lg">
+        <h3 class="font-bold text-lg mb-4">Edit Relationship</h3>
+        <form id="edit-rel-form" class="space-y-3">
+            <input type="hidden" name="to_id" id="edit-rel-to-id">
+            <input type="hidden" name="old_relation" id="edit-rel-old-relation">
+            <div class="form-control">
+                <label class="label"><span class="label-text">Target</span></label>
+                <input type="text" class="input input-bordered input-sm w-full" id="edit-rel-target-display" disabled>
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text">Relation Type</span></label>
+                <select name="new_relation" class="select select-bordered select-sm w-full" required id="edit-rel-type">
+                    <option value="PREREQUISITE_FOR">PREREQUISITE_FOR</option>
+                    <option value="DEPENDS_ON">DEPENDS_ON</option>
+                    <option value="EXTENDS_TO">EXTENDS_TO</option>
+                    <option value="GENERALIZES_TO">GENERALIZES_TO</option>
+                    <option value="USES_INIT_FROM">USES_INIT_FROM</option>
+                    <option value="IMPLEMENTED_BY">IMPLEMENTED_BY</option>
+                    <option value="ENABLES">ENABLES</option>
+                </select>
+            </div>
+            <div class="modal-action">
+                <form method="dialog"><button class="btn btn-sm">Cancel</button></form>
+                <button type="submit" class="btn btn-sm btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Delete Relationship Modal -->
+<dialog id="delete-rel-modal" class="modal">
+    <div class="modal-box border border-error">
+        <h3 class="font-bold text-lg text-error">Delete Relationship</h3>
+        <p class="py-4">Remove <strong id="delete-rel-desc"></strong>?</p>
+        <div class="modal-action">
+            <form method="dialog"><button class="btn btn-sm">Cancel</button></form>
+            <button class="btn btn-sm btn-error" onclick="confirmDeleteRelationship()">Delete</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 <!-- Tab: Upload Materials -->
 <div id="tab-upload" class="settings-panel hidden">
     <div class="card bg-base-100 shadow-sm">
@@ -366,13 +413,9 @@
                 if (sel) sel.classList.remove('hidden');
                 window.location.hash = this.getAttribute('data-tab');
 
-                // Resize graph when switching to graph tab
-                if (this.getAttribute('data-tab') === 'graph' && g6Graph) {
-                    requestAnimationFrame(() => {
-                        const c = document.getElementById('graph-container');
-                        g6Graph.changeSize(c.clientWidth, c.clientHeight);
-                        g6Graph.fitView(20);
-                    });
+                // Refresh and resize graph when switching to graph tab
+                if (this.getAttribute('data-tab') === 'graph') {
+                    loadCourseGraph();
                 }
             });
         });
@@ -571,7 +614,7 @@
         g6Graph = new G6.Graph({
             container: graphContainer, width: w, height: h,
             modes: { default: ['drag-canvas', 'zoom-canvas'] },
-            layout: { type: 'dagre', rankdir: 'LR', nodesep: 40, ranksep: 80 },
+            layout: { type: 'dagre', rankdir: 'TB', nodesep: 40, ranksep: 80 },
             defaultNode: {
                 type: 'rect',
                 size: [80, 40],
@@ -669,7 +712,24 @@
             field('Relevance', raw.relevance_score !== undefined ? (raw.relevance_score * 100).toFixed(0) + '%' : undefined);
             field('Validation', raw.validation_status);
             if (raw.connections && raw.connections.length) {
-                field('Connections', raw.connections.map(c => c.relation + ' → ' + c.to));
+                let connHtml = '<div><span class="font-medium text-base-content/70">Connections</span>'
+                    + '<div class="mt-1 space-y-1">';
+                raw.connections.forEach(c => {
+                    const targetNode = allNodesRaw[c.to];
+                    const targetLabel = targetNode ? (targetNode.label || targetNode.name || c.to) : c.to;
+                    connHtml += '<div class="flex items-center gap-1 text-xs">'
+                        + '<span class="badge badge-outline badge-xs">' + escHtml(c.relation) + '</span>'
+                        + '<span>&rarr; ' + escHtml(targetLabel) + '</span>'
+                        + '<button class="btn btn-ghost btn-xs btn-circle ml-auto" title="Edit" onclick="openEditRelModal(\'' + escHtml(c.to) + '\', \'' + escHtml(c.relation) + '\')">'
+                        + '<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>'
+                        + '</button>'
+                        + '<button class="btn btn-ghost btn-xs btn-circle text-error" title="Delete" onclick="openDeleteRelModal(\'' + escHtml(c.to) + '\', \'' + escHtml(c.relation) + '\')">'
+                        + '<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>'
+                        + '</button>'
+                        + '</div>';
+                });
+                connHtml += '</div></div>';
+                html += connHtml;
             }
         } else if (t === 'procedural') {
             field('Bloom Level', raw.bloom_level);
@@ -713,6 +773,11 @@
             stats.assessment.textContent = nodes.filter(n => normalizeType(n.type) === 'assessment').length;
 
             renderGraph(buildGraphData(root));
+            if (selectedNodeId && allNodesRaw[selectedNodeId]) {
+                showNodeDetail(selectedNodeId);
+            } else {
+                hideNodeDetail();
+            }
             statusEl.textContent = 'Click a node to view details and actions.';
         } catch (err) {
             stats.total.textContent = '0';
@@ -945,6 +1010,66 @@
             showToast('Error creating relationship: ' + err.message, 'error');
         }
     });
+
+    /* ── Edit Relationship ── */
+    function openEditRelModal(toId, oldRelation) {
+        if (!selectedNodeId) return;
+        const targetNode = allNodesRaw[toId];
+        const targetLabel = targetNode ? (targetNode.label || targetNode.name || toId) : toId;
+        document.getElementById('edit-rel-to-id').value = toId;
+        document.getElementById('edit-rel-old-relation').value = oldRelation;
+        document.getElementById('edit-rel-target-display').value = targetLabel;
+        document.getElementById('edit-rel-type').value = oldRelation;
+        document.getElementById('edit-rel-modal').showModal();
+    }
+
+    document.getElementById('edit-rel-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const body = {
+            to_id: document.getElementById('edit-rel-to-id').value,
+            old_relation: document.getElementById('edit-rel-old-relation').value,
+            new_relation: document.getElementById('edit-rel-type').value,
+        };
+        try {
+            await jsonFetch(
+                '/knowledge/node/' + encodeURIComponent(selectedNodeId) + '/relationship',
+                'PUT', body
+            );
+            document.getElementById('edit-rel-modal').close();
+            showToast('Relationship updated.', 'success');
+            loadCourseGraph();
+        } catch (err) {
+            showToast('Error updating relationship: ' + err.message, 'error');
+        }
+    });
+
+    /* ── Delete Relationship ── */
+    let pendingDeleteRel = null;
+
+    function openDeleteRelModal(toId, relation) {
+        if (!selectedNodeId) return;
+        const targetNode = allNodesRaw[toId];
+        const targetLabel = targetNode ? (targetNode.label || targetNode.name || toId) : toId;
+        pendingDeleteRel = { to_id: toId, relation: relation };
+        document.getElementById('delete-rel-desc').textContent = relation + ' \u2192 ' + targetLabel;
+        document.getElementById('delete-rel-modal').showModal();
+    }
+
+    async function confirmDeleteRelationship() {
+        document.getElementById('delete-rel-modal').close();
+        if (!pendingDeleteRel || !selectedNodeId) return;
+        try {
+            await jsonFetch(
+                '/knowledge/node/' + encodeURIComponent(selectedNodeId) + '/relationship',
+                'DELETE', pendingDeleteRel
+            );
+            showToast('Relationship deleted.', 'success');
+            loadCourseGraph();
+        } catch (err) {
+            showToast('Error deleting relationship: ' + err.message, 'error');
+        }
+        pendingDeleteRel = null;
+    }
 
     /* ── Delete Node ── */
     function openDeleteNodeModal() {

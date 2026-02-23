@@ -22,7 +22,7 @@
         <!-- Optional navbar -->
         {% block navbar %}{% endblock %}
 
-        <main class="container mx-auto p-4">
+        <main class="{% block main_class %}container mx-auto{% endblock %} p-4">
             {% block content %}{% endblock %}
         </main>
 
