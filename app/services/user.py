@@ -44,7 +44,7 @@ class UserService:
             self.__logger.debug(f"Executing user creation query for {user.email}")
             result = tx.run(
                 query,
-                props=user.model_dump(by_alias=True),
+                props=user.model_dump(mode="json", by_alias=True),
             )
             node = result.single(strict=True)
             self.__logger.debug("User node created in Neo4j")
@@ -126,7 +126,9 @@ class UserService:
         def tx_fn(
             tx: ManagedTransaction, id: str, to_update: schemas.UpdateUser
         ) -> models.User:
-            params = to_update.model_dump(exclude_unset=True, by_alias=True)
+            params = to_update.model_dump(
+                mode="json", exclude_unset=True, by_alias=True
+            )
             query = f"""
             MATCH (u:{self.__user_node_name}) WHERE u.id = $id
             SET u += $props
@@ -298,7 +300,7 @@ class UserService:
             RETURN t, u.id AS user_id
             """
 
-            params = trajectory_entry.model_dump(by_alias=True)
+            params = trajectory_entry.model_dump(mode="json", by_alias=True)
             self.__logger.debug("Hashing query for full-text index")
             params[self.__trajectory_full_text_index_field] = hash_string(
                 trajectory_entry.query

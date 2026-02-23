@@ -3,7 +3,7 @@ from pathlib import Path
 
 from werkzeug.datastructures import FileStorage
 
-from app import schemas, services
+from app import models, schemas, services
 
 
 class CourseController:
@@ -11,12 +11,16 @@ class CourseController:
         self,
         knowledge_service: services.KnowledgeService,
         user_service: services.UserService,
+        chat_service: services.ChatService,
+        supervisor_agent_service: services.SupervisorAgentService,
         uploads_folder: Path,
         uploads_service: services.KnowledgeUploadService,
     ):
         self.__logger = logging.getLogger(__name__)
         self.__knowledge_service = knowledge_service
         self.__user_service = user_service
+        self.__chat_service = chat_service
+        self.__supervisor_agent_service = supervisor_agent_service
         self.__uploads_folder = uploads_folder
         self.__uploads_service = uploads_service
 
@@ -95,6 +99,41 @@ class CourseController:
     def clear_course(self, course_id: str) -> None:
         self.__logger.info(f"Clearing course: {course_id}")
         self.__knowledge_service.clear_course(course_id)
+
+    def chat_send(
+        self, user_id: str, course_id: str, message: str
+    ) -> schemas.ChatResponse:
+        self.__logger.info(
+            f"Processing chat message for user {user_id} in course {course_id}"
+        )
+
+        history = self.__chat_service.get_messages(user_id, course_id)
+        llm_messages = self.__chat_service.to_llm_messages(history)
+
+        self.__chat_service.add_message(
+            user_id,
+            course_id,
+            models.ChatMessage(role=models.ChatMessageRole.USER, content=message),
+        )
+
+        result = self.__supervisor_agent_service.retrieve_context(
+            user_id, message, message_history=llm_messages
+        )
+
+        answer = (
+            result.answer
+            if result
+            else self.__supervisor_agent_service.RESPONSE_FALLBACK
+        )
+        hint_text = result.hint_text if result else None
+
+        self.__chat_service.add_message(
+            user_id,
+            course_id,
+            models.ChatMessage(role=models.ChatMessageRole.ASSISTANT, content=answer),
+        )
+
+        return schemas.ChatResponse(answer=answer, hint_text=hint_text)
 
     def delete_course(self, course_id: str) -> None:
         self.__logger.info(f"Deleting course: {course_id}")

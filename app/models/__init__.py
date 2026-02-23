@@ -16,9 +16,12 @@ from .knowledge import (
     ProceduralKnowledge,
     RootKnowledge,
 )
+from .chat import ChatMessage, ChatMessageRole
 from .user import User, UserRole, UserTrajectory
 
 __all__ = [
+    "ChatMessage",
+    "ChatMessageRole",
     "User",
     "UserRole",
     "UserTrajectory",

@@ -1,9 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import StrEnum
-from uuid import uuid4
 
 from flask_login import UserMixin
 from pydantic import BaseModel, EmailStr, Field, model_validator
+
+from app import utils
 
 
 class UserRole(StrEnum):
@@ -12,7 +13,7 @@ class UserRole(StrEnum):
 
 
 class User(UserMixin, BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()))
+    id: str = Field(default_factory=utils.uuid4_hex)
     name: str = Field(min_length=2)
     email: EmailStr
     password: str = Field(min_length=8)
@@ -28,8 +29,8 @@ class User(UserMixin, BaseModel):
 
 
 class UserTrajectory(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    id: str = Field(default_factory=utils.uuid4_hex)
+    timestamp: datetime = Field(default_factory=utils.utc_now)
     query: str
     retrieved_nodes: list[str] = Field(default_factory=list)
     scores: list[float] = Field(default_factory=list)

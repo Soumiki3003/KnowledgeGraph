@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 import hashlib
 
+from uuid_utils import uuid4
+
 
 def hash_string(
     input_string: str,
@@ -13,6 +15,10 @@ def hash_string(
     if incensitive:
         input_string = input_string.lower()
     return hashlib.blake2b(input_string.encode(), usedforsecurity=False).hexdigest()
+
+
+def uuid4_hex() -> str:
+    return uuid4().hex
 
 
 def utc_now() -> datetime:

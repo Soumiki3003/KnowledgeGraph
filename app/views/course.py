@@ -91,18 +91,18 @@ def chat_send(
         Application.controllers.course_controller
     ],
 ):
-    # Return user message bubble + assistant response
-    # For now, assistant response is a placeholder since SupervisorAgentService
-    # requires full infrastructure (Neo4j indexes, Ollama, embeddings)
     try:
-        response_text = "I'm processing your question. The full AI assistant will be available once the infrastructure is configured."
+        result = course_controller.chat_send(current_user.id, course_id, form.content)
     except Exception:
-        response_text = "An error occurred while processing your message."
+        result = schemas.ChatResponse(
+            answer="An error occurred while processing your message."
+        )
 
     return render_template(
         "course/chat_message.html",
         user_message=form.content,
-        assistant_message=response_text,
+        assistant_message=result.answer,
+        hint_text=result.hint_text,
         user_name=current_user.name,
     )
 
@@ -171,8 +171,12 @@ def get_members(
     members = course_controller.get_course_members(course_id)
     return jsonify(
         {
-            "instructors": [m.model_dump() for m in members["instructors"]],
-            "students": [m.model_dump() for m in members["students"]],
+            "instructors": [
+                m.model_dump(mode="json", by_alias=True) for m in members["instructors"]
+            ],
+            "students": [
+                m.model_dump(mode="json", by_alias=True) for m in members["students"]
+            ],
         }
     )
 

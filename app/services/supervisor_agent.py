@@ -1,8 +1,10 @@
 import logging
 import re
 import time
+from dataclasses import dataclass
 
 from neo4j_graphrag.generation import GraphRAG
+from neo4j_graphrag.types import LLMMessage
 from pydantic_ai import Agent
 
 from app import models
@@ -10,7 +12,16 @@ from app import models
 from .user import UserService
 
 
+@dataclass
+class SupervisorResult:
+    answer: str
+    hint_text: str | None = None
+    hint_reason: str | None = None
+
+
 class SupervisorAgentService:
+    RESPONSE_FALLBACK = "I couldn't find relevant information to answer your question. Please try rephrasing."
+
     def __init__(
         self,
         *,
@@ -44,12 +55,18 @@ class SupervisorAgentService:
         self.__procedural_keywords = procedural_keywords
         self.__logger = logging.getLogger(__name__)
 
-    def __retrieve_node_metadata(self, query: str):
+    def __retrieve_node_metadata(
+        self,
+        query: str,
+        message_history: list[LLMMessage] | None = None,
+    ):
         start_time = time.time()
         result = self.__graph_rag.search(
             query,
+            message_history=message_history,
             retriever_config={"top_k": self.__top_k},
             return_context=True,
+            response_fallback=self.RESPONSE_FALLBACK,
         )
         response_time_sec = round(time.time() - start_time, 2)
         self.__logger.info(f"Context retrieved in {response_time_sec} seconds")
@@ -154,7 +171,12 @@ class SupervisorAgentService:
 
         return hint_triggered, hint_reason, hint_text
 
-    def retrieve_context(self, user_id: str, query: str):
+    def retrieve_context(
+        self,
+        user_id: str,
+        query: str,
+        message_history: list[LLMMessage] | None = None,
+    ):
         try:
             self.__logger.info(f"Loading user {user_id} state...")
             user = self.__user_service.get_user(user_id)
@@ -167,7 +189,7 @@ class SupervisorAgentService:
 
             self.__logger.info("Retrieving node metadata...")
             rag_result, retrieved_nodes, scores, response_time_sec = (
-                self.__retrieve_node_metadata(query)
+                self.__retrieve_node_metadata(query, message_history)
             )
             node_entry_count = len(retrieved_nodes)
 
@@ -204,7 +226,11 @@ class SupervisorAgentService:
             self.__logger.info(
                 f"Context retrieval logged. ({interaction_type}, {node_entry_count} nodes, {response_time_sec}s)"
             )
-            return rag_result
+            return SupervisorResult(
+                answer=rag_result.answer if rag_result else "",
+                hint_text=hint_text,
+                hint_reason=hint_reason,
+            )
 
         except Exception as e:
             self.__logger.error(f"Error occurred while retrieving context: {e}")

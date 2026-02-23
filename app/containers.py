@@ -165,6 +165,16 @@ class Services(containers.DeclarativeContainer):
         trajectory_vector_index_field="trajectory_vector",
         trajectory_full_text_index_field="trajectory_text",
     )
+    chat = providers.Factory(
+        services.ChatService,
+        session_factory=gateways.neo4j_session.provider,
+    )
+    supervisor_agent = providers.Factory(
+        services.SupervisorAgentService,
+        user_service=user,
+        graph_rag=gateways.trajectory_graphrag,
+        hint_agent=ai.default_agent,
+    )
 
 
 class Controllers(containers.DeclarativeContainer):
@@ -186,6 +196,8 @@ class Controllers(containers.DeclarativeContainer):
         controllers.CourseController,
         knowledge_service=services.knowledge,
         user_service=services.user,
+        chat_service=services.chat,
+        supervisor_agent_service=services.supervisor_agent,
         uploads_folder=core.uploads_folder,
         uploads_service=services.knowledge_upload,
     )

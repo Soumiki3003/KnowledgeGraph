@@ -20,11 +20,11 @@ core:
 ai:
   agents:
     default:
-      model: ${DEFAULT_MODEL:ollama:qwen3:30b}
+      model: ${DEFAULT_MODEL:ollama:gpt-oss:20b}
     knowledge_file:
-      model: ${KNOWLEDGE_FILE_MODEL:ollama:qwen3:30b}
+      model: ${KNOWLEDGE_FILE_MODEL:ollama:gpt-oss:20b}
     graph:
-      model: ${GRAPH_MODEL:ollama:qwen3:30b}
+      model: ${GRAPH_MODEL:ollama:gpt-oss:20b}
   embedder:
     default:
       model: ${EMBEDDER_MODEL:ollama:qwen3-embedding:8b}

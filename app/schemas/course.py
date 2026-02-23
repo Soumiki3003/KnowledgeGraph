@@ -1,8 +1,5 @@
-from datetime import datetime
-
 from pydantic import BaseModel, Field
 
-from app import utils
 from app.schemas.common import Paginated
 
 
@@ -36,11 +33,3 @@ class CourseMember(BaseModel):
 class PaginatedCourses(Paginated):
     user_id: str | None = None
     user_role: str | None = None
-
-
-class ChatUserMessageFormRequest(BaseModel):
-    content: str = Field(description="Content of the message")
-    created_at: datetime = Field(
-        default_factory=utils.utc_now,
-        description="Timestamp of when the message was created",
-    )

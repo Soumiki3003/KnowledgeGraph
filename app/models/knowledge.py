@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal, Optional
-from uuid import uuid4
 
 from pydantic import BaseModel, Field, computed_field, model_validator
+
+from app import utils
 
 
 class KnowledgeDifficulty(StrEnum):
@@ -61,9 +61,9 @@ class KnowledgeValidationStatus(StrEnum):
 
 class BaseChildKnowledge(BaseModel):
     id: str = Field(
-        default_factory=lambda: str(uuid4()),
+        default_factory=utils.uuid4_hex,
         description="Unique identifier for the knowledge node, used for referencing and retrieval",
-        examples=[uuid4().hex],
+        examples=[utils.uuid4_hex()],
     )
 
     name: str = Field(
@@ -88,7 +88,7 @@ class ConceptualKnowledgeConnection(BaseModel):
     )
     to: str = Field(
         description="Name of the target conceptual knowledge node that this connection points to, used for structuring the knowledge graph and providing explanations to students",
-        examples=[uuid4().hex],
+        examples=[utils.uuid4_hex()],
     )
 
 
@@ -268,9 +268,9 @@ class AssessmentKnowledge(BaseChildKnowledge):
 
 class RootKnowledge(BaseModel):
     id: str = Field(
-        default_factory=lambda: str(uuid4()),
+        default_factory=utils.uuid4_hex,
         description="Unique identifier for the knowledge node, used for referencing and retrieval",
-        examples=[uuid4().hex],
+        examples=[utils.uuid4_hex()],
     )
     type_: Literal[KnowledgeType.ROOT] = Field(
         default=KnowledgeType.ROOT, alias="type", examples=[KnowledgeType.ROOT]
@@ -315,7 +315,7 @@ class KnowledgeUploadStatus(StrEnum):
 class KnowledgeUploadRecord(BaseModel):
     id: str = Field(
         description="Unique identifier for the upload",
-        default_factory=lambda: uuid.uuid4().hex,
+        default_factory=utils.uuid4_hex,
     )
     filepath: Path = Field(description="Name of the uploaded file", exclude=True)
     status: KnowledgeUploadStatus = Field(
@@ -329,7 +329,10 @@ class KnowledgeUploadRecord(BaseModel):
         default=None, description="ID of the generated knowledge graph"
     )
 
-    created_at: datetime = Field(description="Timestamp when file was uploaded")
+    created_at: datetime = Field(
+        default_factory=utils.utc_now,
+        description="Timestamp when file was uploaded",
+    )
     updated_at: datetime | None = Field(
         default=None, description="Timestamp when file was updated"
     )

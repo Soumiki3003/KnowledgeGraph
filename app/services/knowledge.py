@@ -1,16 +1,13 @@
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from contextlib import AbstractContextManager
 from typing import Callable
-from uuid import uuid4
 
 import jinja2
 import pydantic_ai
 from neo4j import ManagedTransaction, Session, Transaction, unit_of_work
 
-from app import models, schemas, services
-from app.models.knowledge import Knowledge
+from app import models, schemas, services, utils
 from tests import factories
 
 
@@ -20,14 +17,9 @@ class KnowledgeUploadService:
         self.__db = db
         self.__logger = logging.getLogger(__name__)
 
-    def __get_now(self):
-        return datetime.now(timezone.utc)
-
     def create(self, filepath: Path) -> str:
         self.__logger.info(f"Creating upload record for file: {filepath.name}")
-        new_upload = models.KnowledgeUploadRecord(
-            filepath=filepath, created_at=self.__get_now()
-        )
+        new_upload = models.KnowledgeUploadRecord(filepath=filepath)
         self.__db[new_upload.id] = new_upload
         self.__logger.debug(f"Upload record created with ID: {new_upload.id}")
         return new_upload.id
@@ -57,7 +49,7 @@ class KnowledgeUploadService:
             raise ValueError(f"Upload ID not found: {upload_id}")
         for key, value in data.items():
             setattr(self.__db[upload_id], key, value)
-        self.__db[upload_id].updated_at = self.__get_now()
+        self.__db[upload_id].updated_at = utils.utc_now()
         return self.__db[upload_id].model_copy(deep=True)
 
     def mark_as_processing(self, upload_id: str) -> models.KnowledgeUploadRecord:
@@ -628,7 +620,7 @@ class KnowledgeService:
         parent_id: str | None = None,
         *,
         tx: Transaction,
-    ) -> Knowledge:
+    ) -> models.Knowledge:
         self.__logger.info(
             f"Creating knowledge node with name '{item.name}' and ID '{item.id}' under parent ID '{parent_id}'"
         )
@@ -908,7 +900,7 @@ class KnowledgeService:
         props: dict,
     ) -> str:
         """Create a new child node under the given parent and return its ID."""
-        node_id = str(uuid4())
+        node_id = utils.uuid4_hex()
         props["id"] = node_id
         props["type"] = child_type
         self.__logger.info(f"Adding {child_type} child node under parent {parent_id}")

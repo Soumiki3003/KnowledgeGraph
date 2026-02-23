@@ -51,7 +51,9 @@ class KnowledgeController:
             raise
 
     def update_node(self, node_id: str, form: schemas.UpdateNodeRequest) -> None:
-        updates = form.model_dump(exclude_none=True, exclude={"type"})
+        updates = form.model_dump(
+            mode="json", by_alias=True, exclude_none=True, exclude={"type"}
+        )
         self.__knowledge_service.update_node(node_id, updates)
 
     def delete_node(self, node_id: str, course_id: str) -> None:
@@ -60,7 +62,7 @@ class KnowledgeController:
     def add_child_node(
         self, parent_id: str, form: schemas.CreateChildNodeRequest
     ) -> str:
-        props = form.model_dump(exclude={"type"})
+        props = form.model_dump(mode="json", by_alias=True, exclude={"type"})
         return self.__knowledge_service.add_child_node(parent_id, form.type, props)
 
     def add_relationship(
