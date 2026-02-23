@@ -89,7 +89,7 @@
         <div class="modal-box border border-error">
             <h3 class="font-bold text-lg text-error">Delete Course</h3>
             <p class="py-4">This will <strong>permanently delete</strong> the entire course, including the root node and all knowledge graph data. This action <strong>cannot be undone</strong>.</p>
-            <p class="text-sm text-base-content/60">Type the course name to confirm:</p>
+            <p class="text-sm text-base-content/60">Type <kbd class="kbd kbd-sm">{{ course.name }}</kbd> to confirm:</p>
             <input id="delete-confirm-input" type="text" class="input input-bordered input-error w-full mt-2" placeholder="{{ course.name }}">
             <div class="modal-action">
                 <form method="dialog">
@@ -431,11 +431,14 @@
         }
         function addEdge(s, t, rel) {
             if (!s || !t) return;
-            const color = rel === 'HAS_CHILD' ? '#60A5FA' : '#9CA3AF';
-            edges.push({
-                source: s, target: t, label: rel || 'HAS_CHILD',
+            const isChild = !rel || rel === 'HAS_CHILD';
+            const color = isChild ? '#60A5FA' : '#9CA3AF';
+            const edge = {
+                source: s, target: t,
                 style: { stroke: color, endArrow: { path: G6.Arrow.triangle(8, 10, 0), fill: color } },
-            });
+            };
+            if (!isChild) edge.label = rel;
+            edges.push(edge);
         }
         function walk(n) {
             addNode(n);
@@ -451,7 +454,7 @@
         const w = graphContainer.clientWidth, h = graphContainer.clientHeight;
         g6Graph = new G6.Graph({
             container: graphContainer, width: w, height: h,
-            modes: { default: ['drag-canvas', 'zoom-canvas', 'click-select'] },
+            modes: { default: ['drag-canvas', 'zoom-canvas'] },
             layout: { type: 'dagre', rankdir: 'LR', nodesep: 40, ranksep: 80 },
             defaultNode: {
                 type: 'rect',
@@ -466,12 +469,19 @@
                 style: { radius: 10, endArrow: true },
                 labelCfg: { autoRotate: true, style: { fill: '#6B7280', fontSize: 9, background: { fill: '#F3F4F6', padding: [2, 4, 2, 4], radius: 2 } } },
             },
+            nodeStateStyles: {
+                highlight: {
+                    lineWidth: 3,
+                    shadowColor: 'rgba(0,0,0,0.5)',
+                    shadowBlur: 12,
+                },
+            },
             fitView: true, fitViewPadding: 20,
         });
 
         g6Graph.node(node => ({
             style: { fill: getNodeColor(node.nodeType), stroke: '#1F2937', lineWidth: 2, radius: 8 },
-            labelCfg: { style: { fill: '#fff', fontSize: 11, fontWeight: 500 } },
+            labelCfg: { style: { fill: '#1F2937', fontSize: 11, fontWeight: 500 } },
         }));
 
         g6Graph.on('node:click', evt => {
@@ -507,7 +517,7 @@
         if (g6Graph) {
             g6Graph.getNodes().forEach(n => g6Graph.clearItemStates(n));
             const item = g6Graph.findById(nodeId);
-            if (item) g6Graph.setItemState(item, 'selected', true);
+            if (item) g6Graph.setItemState(item, 'highlight', true);
         }
 
         const t = normalizeType(raw.type);
