@@ -60,7 +60,7 @@ class UserService:
             raise ValueError(f"User with email {item.email} already exists")
 
         self.__logger.debug("Hashing user password")
-        password_hash = self.__auth_service.hash_password(item.password)
+        password_hash = self.__auth_service.hash_password(item.password.get_secret_value())
 
         # Create User model with auto-generated ID
         new_user = models.User(
