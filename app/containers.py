@@ -3,7 +3,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-import logfire
+try:
+    import logfire
+except ImportError:
+    logfire = None
+
 from dependency_injector import containers, providers
 from jinja2 import Environment, FileSystemLoader
 from pydantic_ai import Agent, Embedder
@@ -24,8 +28,9 @@ def folder(folderpath: str) -> Generator[Path, None, None]:
 
 @contextmanager
 def setup_logs(config: dict):
-    logfire.configure()
-    logfire.instrument_pydantic_ai()
+    if logfire is not None:
+        logfire.configure()
+        logfire.instrument_pydantic_ai()
 
     root_log = logging.config.dictConfig(config)
     yield root_log
