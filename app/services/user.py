@@ -1,4 +1,6 @@
 from contextlib import AbstractContextManager
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 import logging
 from typing import Any, Callable, Literal
 
@@ -60,7 +62,9 @@ class UserService:
             raise ValueError(f"User with email {item.email} already exists")
 
         self.__logger.debug("Hashing user password")
-        password_hash = self.__auth_service.hash_password(item.password.get_secret_value())
+        password_hash = self.__auth_service.hash_password(
+            item.password.get_secret_value()
+        )
 
         # Create User model with auto-generated ID
         new_user = models.User(
@@ -296,7 +300,9 @@ class UserService:
             WHERE prev_t <> t
             ORDER BY prev_t.timestamp DESC
             LIMIT 1
-            CREATE (t)-[:{self.__trajectory_prev_rel_name}]->(prev_t)
+            FOREACH (_ IN CASE WHEN prev_t IS NOT NULL THEN [1] ELSE [] END |
+                CREATE (t)-[:{self.__trajectory_prev_rel_name}]->(prev_t)
+            )
             RETURN t, u.id AS user_id
             """
 
@@ -306,14 +312,20 @@ class UserService:
                 trajectory_entry.query
             )
             self.__logger.debug("Embedding query for vector search")
-            params[self.__trajectory_vector_index_field] = (
-                self.__embedder.embed_documents_sync([trajectory_entry.query])[0]
-            )
+            try:
+                params[self.__trajectory_vector_index_field] = (
+                    self.__embedder.embed_documents_sync([trajectory_entry.query])[0]
+                )
+            except Exception as embed_err:
+                self.__logger.warning(
+                    f"Embedding failed, storing zero vector: {embed_err}"
+                )
+                params[self.__trajectory_vector_index_field] = [0.0] * 384
 
             self.__logger.debug("Creating trajectory node in Neo4j")
             result = tx.run(
                 query,
-                params,
+                props=params,
                 user_id=user_id,
             )
             node = result.single(strict=True)
@@ -369,6 +381,159 @@ class UserService:
 
         with self.__session_factory() as session:
             return session.execute_read(tx_fn, role)
+
+    def get_pending_hints(
+        self, course_id: str
+    ) -> list[tuple[models.UserTrajectory, str]]:
+        """Return (trajectory, user_name) tuples for all pending hints in a course."""
+
+        @unit_of_work()
+        def tx_fn(
+            tx: ManagedTransaction, course_id: str
+        ) -> list[tuple[models.UserTrajectory, str]]:
+            query = f"""
+            MATCH (u:{self.__user_node_name})-[:{self.__trajectory_rel_name}]->(t:{self.__trajectory_node_name})
+            WHERE t.course_id = $course_id
+              AND t.hint_triggered = true
+              AND t.hint_approval_status = $approval_status
+            RETURN t, u.id AS user_id, u.name AS user_name
+            ORDER BY t.timestamp DESC
+            """
+            result = tx.run(
+                query,
+                course_id=course_id,
+                approval_status=models.HintApprovalStatus.PENDING,
+            )
+            items = []
+            for record in result:
+                data = dict(record["t"])
+                data["user_id"] = record["user_id"]
+                trajectory = models.UserTrajectory(**data)
+                items.append((trajectory, record["user_name"]))
+            return items
+
+        with self.__session_factory() as session:
+            return session.execute_read(tx_fn, course_id)
+
+    def update_hint_approval(
+        self,
+        trajectory_id: str,
+        status: models.HintApprovalStatus,
+        *,
+        hint_text: str | None = None,
+    ) -> models.UserTrajectory | None:
+        """Set the approval status (and optionally the hint text) on a trajectory node.
+
+        ``hint_text`` is only written when the caller supplies a non-empty value,
+        so that passing ``None`` leaves the existing text untouched.
+        """
+
+        @unit_of_work()
+        def tx_fn(
+            tx: ManagedTransaction,
+            trajectory_id: str,
+            status: str,
+            hint_text: str | None,
+        ) -> models.UserTrajectory | None:
+            set_clause = "SET t.hint_approval_status = $status"
+            params: dict = {"trajectory_id": trajectory_id, "status": status}
+            if hint_text is not None:
+                set_clause += ", t.hint_text = $hint_text"
+                params["hint_text"] = hint_text
+
+            query = f"""
+            MATCH (u:{self.__user_node_name})-[:{self.__trajectory_rel_name}]->(t:{self.__trajectory_node_name})
+            WHERE t.id = $trajectory_id
+            {set_clause}
+            RETURN t, u.id AS user_id
+            """
+            result = tx.run(query, **params)
+            record = result.single()
+            if not record:
+                return None
+            data = dict(record["t"])
+            data["user_id"] = record["user_id"]
+            return models.UserTrajectory(**data)
+
+        with self.__session_factory() as session:
+            return session.execute_write(tx_fn, trajectory_id, str(status), hint_text)
+
+    def get_approved_hints_for_student(
+        self, user_id: str, course_id: str
+    ) -> list[models.UserTrajectory]:
+        """Return approved hints for a student that have not yet expired.
+
+        A hint expires 24 h after it was first read (``hint_read_when`` is set on
+        first view).  Hints that have never been read are always returned.
+        """
+        expiry_threshold = (
+            datetime.now(timezone.utc) - relativedelta(hours=24)
+        ).isoformat()
+
+        @unit_of_work()
+        def tx_fn(
+            tx: ManagedTransaction, user_id: str, course_id: str, expiry_threshold: str
+        ) -> list[models.UserTrajectory]:
+            query = f"""
+            MATCH (u:{self.__user_node_name})-[:{self.__trajectory_rel_name}]->(t:{self.__trajectory_node_name})
+            WHERE u.id = $user_id
+              AND t.course_id = $course_id
+              AND t.hint_triggered = true
+              AND t.hint_approval_status = $approval_status
+              AND (t.hint_read_when IS NULL OR t.hint_read_when > $expiry_threshold)
+            RETURN t, u.id AS user_id
+            ORDER BY t.timestamp ASC
+            """
+            result = tx.run(
+                query,
+                user_id=user_id,
+                course_id=course_id,
+                approval_status=models.HintApprovalStatus.APPROVED,
+                expiry_threshold=expiry_threshold,
+            )
+            items = []
+            for record in result:
+                data = dict(record["t"])
+                data["user_id"] = record["user_id"]
+                items.append(models.UserTrajectory(**data))
+            return items
+
+        with self.__session_factory() as session:
+            return session.execute_read(tx_fn, user_id, course_id, expiry_threshold)
+
+    def mark_hint_read(self, trajectory_id: str, course_id: str) -> None:
+        """Record the first time a student sees a hint (sets ``hint_read_when``).
+
+        ``course_id`` is matched to ensure the trajectory belongs to the
+        expected course before updating. If the hint was already read the
+        timestamp is left unchanged so the 24-hour expiry window is not reset
+        by subsequent views.
+        """
+
+        @unit_of_work()
+        def tx_fn(
+            tx: ManagedTransaction,
+            trajectory_id: str,
+            course_id: str,
+            hint_read_when: str,
+        ) -> None:
+            query = f"""
+            MATCH (t:{self.__trajectory_node_name})
+            WHERE t.id = $trajectory_id
+              AND t.course_id = $course_id
+              AND t.hint_read_when IS NULL
+            SET t.hint_read_when = $hint_read_when
+            """
+            tx.run(
+                query,
+                trajectory_id=trajectory_id,
+                course_id=course_id,
+                hint_read_when=hint_read_when,
+            )
+
+        hint_read_when = datetime.now(timezone.utc).isoformat()
+        with self.__session_factory() as session:
+            session.execute_write(tx_fn, trajectory_id, course_id, hint_read_when)
 
     def delete_user(self, id: str) -> None:
         to_update = schemas.UpdateUser(enabled=False)

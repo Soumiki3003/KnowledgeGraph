@@ -175,6 +175,7 @@ class SupervisorAgentService:
         self,
         user_id: str,
         query: str,
+        course_id: str,
         message_history: list[LLMMessage] | None = None,
     ):
         try:
@@ -221,6 +222,7 @@ class SupervisorAgentService:
                 hint_triggered=hint_triggered,
                 hint_reason=hint_reason,
                 hint_text=hint_text,
+                course_id=course_id,
             )
             self.__user_service.add_trajectory_entry(user_id, new_trajectory)
             self.__logger.info(

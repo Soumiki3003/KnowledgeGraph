@@ -219,6 +219,113 @@ def clear_course(
         return {"error": str(e)}, 500
 
 
+@app.route("/course/<course_id>/hints", methods=["GET"])
+@roles_required("instructor")
+@inject
+def get_hints(
+    course_id: str,
+    *,
+    course_controller: controllers.CourseController = Provide[
+        Application.controllers.course_controller
+    ],
+):
+    """Return the pending-hints partial for the instructor settings page."""
+    hints = course_controller.get_pending_hints(course_id)
+    return render_template(
+        "course/hint_item.html",
+        hints=hints,
+        course_id=course_id,
+    )
+
+
+@app.route("/course/<course_id>/hints/<trajectory_id>", methods=["PUT"])
+@roles_required("instructor")
+@validate()
+@inject
+def update_hint(
+    course_id: str,
+    trajectory_id: str,
+    form: schemas.UpdateHintApprovalRequest,
+    *,
+    course_controller: controllers.CourseController = Provide[
+        Application.controllers.course_controller
+    ],
+):
+    """Approve or reject a hint; returns the updated single-hint card."""
+    try:
+        # Strip blank-only edits so an empty textarea doesn't overwrite the text
+        hint_text = form.hint_text.strip() if form.hint_text else None
+        trajectory = course_controller.update_hint_approval(
+            trajectory_id, form.status, hint_text=hint_text or None
+        )
+        if not trajectory:
+            return {"error": "Hint not found"}, 404
+        return render_template(
+            "course/hint_item.html",
+            hints=[],  # empty list signals the row should be removed
+            course_id=course_id,
+        )
+    except ValueError as e:
+        return {"error": str(e)}, 400
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@app.route("/course/<course_id>/hints/student/count", methods=["GET"])
+@login_required
+@inject
+def student_hints_count(
+    course_id: str,
+    *,
+    course_controller: controllers.CourseController = Provide[
+        Application.controllers.course_controller
+    ],
+):
+    """Return the hint-badge count fragment (HTMX polling target)."""
+    hints = course_controller.get_approved_hints(current_user.id, course_id)
+    return render_template("course/hint_badge.html", count=len(hints))
+
+
+@app.route("/course/<course_id>/hints/student", methods=["GET"])
+@login_required
+@inject
+def student_hints(
+    course_id: str,
+    *,
+    course_controller: controllers.CourseController = Provide[
+        Application.controllers.course_controller
+    ],
+):
+    """Return a single approved hint at the requested index (HTMX modal body)."""
+    index = request.args.get("index", 0, type=int)
+    hints = course_controller.get_approved_hints(current_user.id, course_id)
+    total = len(hints)
+    hint = hints[index] if hints and 0 <= index < total else None
+    return render_template(
+        "course/approved_hints.html",
+        hint=hint,
+        index=index,
+        total=total,
+        course_id=course_id,
+    )
+
+
+@app.route("/course/<course_id>/hints/<trajectory_id>/read", methods=["POST"])
+@login_required
+@inject
+def mark_hint_read(
+    course_id: str,
+    trajectory_id: str,
+    *,
+    course_controller: controllers.CourseController = Provide[
+        Application.controllers.course_controller
+    ],
+):
+    """Mark a hint as read the first time the student views it."""
+    course_controller.mark_hint_read(trajectory_id, course_id)
+    return "", 204
+
+
 @app.route("/course/<course_id>/upload", methods=["POST"])
 @roles_required("instructor")
 @inject

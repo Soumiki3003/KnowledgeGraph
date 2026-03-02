@@ -8,7 +8,6 @@ import pydantic_ai
 from neo4j import ManagedTransaction, Session, Transaction, unit_of_work
 
 from app import models, schemas, services, utils
-from tests import factories
 
 
 class KnowledgeUploadService:
@@ -101,7 +100,6 @@ class KnowledgeService:
         static_folder: Path,
         template_env: jinja2.Environment,
         batch_size: int = 20,
-        fake_generation: bool = False,
     ):
         self.__agent = agent
         self.__session_factory = session_factory
@@ -111,7 +109,6 @@ class KnowledgeService:
         self.__logger = logging.getLogger(__name__)
         self.__template_env = template_env
         self.__batch_size = batch_size
-        self.__fake_generation = fake_generation
 
     def get_knowledge(self, knowledge_id: str) -> models.Knowledge:
         @unit_of_work()
@@ -343,13 +340,7 @@ class KnowledgeService:
     def create_knowledge_from_file(self, file_path: Path) -> str:
         self.__logger.info(f"Starting knowledge creation from file: {file_path.name}")
         upload_id = self.__upload_service.create(file_path)
-        if self.__fake_generation:
-            self.__logger.warning(
-                "Fake generation enabled - using factory to create knowledge graph"
-            )
-            root_knowledge = factories.RootKnowledgeFactory.build()
-        else:
-            root_knowledge = self.__process_pages_batch(upload_id, file_path)
+        root_knowledge = self.__process_pages_batch(upload_id, file_path)
 
         try:
             self.__logger.info("Processing all pages complete.")
@@ -401,14 +392,7 @@ class KnowledgeService:
     def add_document_to_course(self, course_id: str, file_path: Path) -> str:
         self.__logger.info(f"Adding document {file_path.name} to course {course_id}")
         upload_id = self.__upload_service.create(file_path)
-
-        if self.__fake_generation:
-            self.__logger.warning(
-                "Fake generation enabled - using factory to create knowledge graph"
-            )
-            new_root = factories.RootKnowledgeFactory.build()
-        else:
-            new_root = self.__process_pages_batch(upload_id, file_path)
+        new_root = self.__process_pages_batch(upload_id, file_path)
 
         try:
             relative_path = file_path.relative_to(self.__static_folder).as_posix()

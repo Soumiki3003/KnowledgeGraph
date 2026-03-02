@@ -48,10 +48,6 @@ gateways:
     user: ${NEO4J_USER:neo4j}
     password: ${NEO4J_PASS:password}
 
-services:
-  knowledge:
-    fake_generation: ${FAKE_GENERATION:false}
-
 flask:
   secret_key: ${SECRET_KEY:dev-secret}
   debug: ${FLASK_DEBUG:true}

@@ -117,7 +117,7 @@ class CourseController:
         )
 
         result = self.__supervisor_agent_service.retrieve_context(
-            user_id, message, message_history=llm_messages
+            user_id, message, course_id, message_history=llm_messages
         )
 
         answer = (
@@ -134,6 +134,26 @@ class CourseController:
         )
 
         return schemas.ChatResponse(answer=answer, hint_text=hint_text)
+
+    def get_pending_hints(self, course_id: str):
+        return self.__user_service.get_pending_hints(course_id)
+
+    def update_hint_approval(
+        self,
+        trajectory_id: str,
+        status: models.HintApprovalStatus,
+        *,
+        hint_text: str | None = None,
+    ):
+        return self.__user_service.update_hint_approval(
+            trajectory_id, status, hint_text=hint_text
+        )
+
+    def get_approved_hints(self, user_id: str, course_id: str):
+        return self.__user_service.get_approved_hints_for_student(user_id, course_id)
+
+    def mark_hint_read(self, trajectory_id: str, course_id: str) -> None:
+        self.__user_service.mark_hint_read(trajectory_id, course_id)
 
     def delete_course(self, course_id: str) -> None:
         self.__logger.info(f"Deleting course: {course_id}")

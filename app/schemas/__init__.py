@@ -26,7 +26,7 @@ from .file import (
 
 from .common import Paginated
 from .auth import LoginRequest
-from .chat import ChatResponse, ChatUserMessageFormRequest
+from .chat import ChatResponse, ChatUserMessageFormRequest, UpdateHintApprovalRequest
 from .course import (
     CreateCourse,
     UpdateCourseMembers,
@@ -50,6 +50,7 @@ __all__ = [
     "CourseMember",
     "ChatUserMessageFormRequest",
     "ChatResponse",
+    "UpdateHintApprovalRequest",
     "UpdateNodeRequest",
     "UpdateRootNodeRequest",
     "UpdateConceptualNodeRequest",

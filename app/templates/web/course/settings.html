@@ -32,6 +32,10 @@
     <a class="tab" data-tab="members">Members</a>
     <a class="tab" data-tab="prompts">Agent Prompts</a>
     <a class="tab" data-tab="domain">Domain Language</a>
+    <a class="tab" data-tab="hints">
+        Hints
+        <span id="hints-badge" class="badge badge-warning badge-xs ml-1 hidden">!</span>
+    </a>
 </div>
 
 <!-- Tab: Knowledge Graph -->
@@ -463,6 +467,38 @@
                     <p class="text-sm">Domain language configuration is coming soon.</p>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Hints (instructor approval) -->
+<div id="tab-hints" class="settings-panel hidden">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">Pending Hints</h2>
+        <button
+            class="btn btn-sm btn-outline"
+            hx-get="{{ url_for('course.get_hints', course_id=course_id) }}"
+            hx-target="#hints-list"
+            hx-swap="innerHTML"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+        </button>
+    </div>
+    <p class="text-sm text-base-content/60 mb-4">
+        Review and approve hints that the system generated for students in this course. Only approved hints are shown to students.
+    </p>
+    <div
+        id="hints-list"
+        class="space-y-3"
+        hx-get="{{ url_for('course.get_hints', course_id=course_id) }}"
+        hx-trigger="revealed"
+        hx-swap="innerHTML"
+    >
+        <div class="flex justify-center py-6">
+            <span class="loading loading-spinner loading-md text-warning"></span>
         </div>
     </div>
 </div>

@@ -12,6 +12,12 @@ class UserRole(StrEnum):
     INSTRUCTOR = "instructor"
 
 
+class HintApprovalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class User(UserMixin, BaseModel):
     id: str = Field(default_factory=utils.uuid4_hex)
     name: str = Field(min_length=2)
@@ -41,6 +47,9 @@ class UserTrajectory(BaseModel):
     hint_triggered: bool = False
     hint_reason: str | None = None
     hint_text: str | None = None
+    hint_approval_status: HintApprovalStatus | None = None
+    hint_read_when: datetime | None = None
+    course_id: str | None = None
 
     user_id: str
 
@@ -59,4 +68,6 @@ class UserTrajectory(BaseModel):
                 )
             if not self.hint_text:
                 raise ValueError("hint_text must be provided if hint_triggered is True")
+            if self.hint_approval_status is None:
+                self.hint_approval_status = HintApprovalStatus.PENDING
         return self

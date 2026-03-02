@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app import utils
+from app import utils, models
 
 
 class ChatUserMessageFormRequest(BaseModel):
@@ -16,3 +16,8 @@ class ChatUserMessageFormRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     hint_text: str | None = None
+
+
+class UpdateHintApprovalRequest(BaseModel):
+    status: models.HintApprovalStatus
+    hint_text: str | None = None  # optional edited hint text supplied by the instructor

@@ -159,7 +159,6 @@ class Services(containers.DeclarativeContainer):
         file_service=file,
         upload_service=knowledge_upload,
         static_folder=core.static_folder,
-        fake_generation=config.knowledge.fake_generation.as_(bool),
     )
     user = providers.Factory(
         services.UserService,

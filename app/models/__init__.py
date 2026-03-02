@@ -17,7 +17,7 @@ from .knowledge import (
     RootKnowledge,
 )
 from .chat import ChatMessage, ChatMessageRole
-from .user import User, UserRole, UserTrajectory
+from .user import User, UserRole, UserTrajectory, HintApprovalStatus
 
 __all__ = [
     "ChatMessage",
@@ -25,6 +25,7 @@ __all__ = [
     "User",
     "UserRole",
     "UserTrajectory",
+    "HintApprovalStatus",
     "KnowledgeDifficulty",
     "KnowledgeType",
     "KnowledgeConceptualBloomLevel",

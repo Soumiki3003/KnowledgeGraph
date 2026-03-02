@@ -23,7 +23,7 @@
 {% block content %}
 <div class="flex gap-4 h-full">
     <!-- Sidebar -->
-    <div class="w-64 hidden lg:block">
+    <div class="w-72 hidden lg:flex flex-col gap-3">
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-4">
                 <h3 class="font-semibold text-sm mb-2">
@@ -41,6 +41,41 @@
     <div class="flex-1 flex flex-col">
         <div class="card bg-base-100 shadow-sm flex-1">
             <div class="card-body p-4 flex flex-col">
+
+                <!-- Chat header: course name + hint notification icon -->
+                <div class="flex items-center justify-between mb-1">
+                    <h2 class="font-semibold text-base truncate">{{ course.name }}</h2>
+
+                    <!-- Hint notification button -->
+                    <div class="relative">
+                        <button
+                            class="btn btn-ghost btn-sm btn-circle tooltip tooltip-left"
+                            data-tip="View hints"
+                            onclick="document.getElementById('hint-modal').showModal()"
+                            hx-get="{{ url_for('course.student_hints', course_id=course_id) }}?index=0"
+                            hx-target="#hint-modal-body"
+                            hx-swap="innerHTML"
+                            hx-trigger="click"
+                        >
+                            <!-- Lightbulb icon -->
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                        </button>
+
+                        <!-- Badge (HTMX polling) -->
+                        <span
+                            id="hint-badge"
+                            hx-get="{{ url_for('course.student_hints_count', course_id=course_id) }}"
+                            hx-trigger="load, every 10s"
+                            hx-swap="innerHTML"
+                            class="absolute -top-1 -right-1 pointer-events-none"
+                        ></span>
+                    </div>
+                </div>
+
+                <div class="divider my-1"></div>
+
                 <!-- Messages -->
                 <div id="chat-messages" class="flex-1 space-y-4 overflow-y-auto px-2">
                     {% if not messages %}
@@ -87,4 +122,31 @@
         </div>
     </div>
 </div>
+
+<!-- ── Hint modal ─────────────────────────────────────────────────── -->
+<dialog id="hint-modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-md">
+        <!-- Header -->
+        <div class="flex items-center gap-2 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <h3 class="font-bold text-lg">Hints from your instructor</h3>
+            <form method="dialog" class="ml-auto">
+                <button class="btn btn-sm btn-circle btn-ghost">✕</button>
+            </form>
+        </div>
+
+        <!-- Content loaded by HTMX -->
+        <div id="hint-modal-body">
+            <div class="flex justify-center py-6">
+                <span class="loading loading-spinner loading-md text-warning"></span>
+            </div>
+        </div>
+    </div>
+    <!-- Click outside to close -->
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 {% endblock %}
