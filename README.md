@@ -145,3 +145,7 @@ Key points:
 - Dependency wiring is centralized in `app/containers.py`
 - Neo4j and GraphRAG integrations live in `app/gateways/neo4j.py`
 - Prompt templates are in `app/templates/prompts/`
+
+## TODO
+
+- Feature: Create hints
