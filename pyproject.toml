@@ -39,3 +39,7 @@ dev = [
 ]
 
 logfire = ["logfire>=4.25.0"]
+
+[tool.coverage.run]
+source = ["app", "main", "seed_demo"]
+omit = ["tests/*"]
