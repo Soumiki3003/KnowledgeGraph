@@ -1,8 +1,9 @@
 """Tests for response rewriter — Concern #4: KG Internals Exposed (TDD RED phase)."""
+
 import pytest
 from unittest.mock import MagicMock
 
-from app.services.supervisor_agent import SupervisorAgentService, SupervisorResult
+from app.services.supervisor_agent import SupervisorAgentService
 
 
 @pytest.fixture
@@ -70,7 +71,9 @@ def test_rewriter_strips_kg_terms(supervisor_agent_with_rewriter, _happy_path_mo
         assert term.lower() not in res.answer.lower()
 
 
-def test_raw_answer_preserved_in_trajectory(supervisor_agent_with_rewriter, _happy_path_mocks):
+def test_raw_answer_preserved_in_trajectory(
+    supervisor_agent_with_rewriter, _happy_path_mocks
+):
     svc = supervisor_agent_with_rewriter
     raw = (
         "Based on the knowledge graph node 'angr_framework', "
@@ -101,7 +104,9 @@ def test_raw_answer_preserved_in_trajectory(supervisor_agent_with_rewriter, _hap
     assert traj.raw_answer == raw
 
 
-def test_rewriter_called_before_returning_result(supervisor_agent_with_rewriter, _happy_path_mocks):
+def test_rewriter_called_before_returning_result(
+    supervisor_agent_with_rewriter, _happy_path_mocks
+):
     rewritten = "This is a clean, student-friendly answer."
     svc = supervisor_agent_with_rewriter
     mock_out = MagicMock()
@@ -117,7 +122,9 @@ def test_rewriter_called_before_returning_result(supervisor_agent_with_rewriter,
     svc._SupervisorAgentService__rewrite_agent.run_sync.assert_called_once()
 
 
-def test_rewriter_not_called_when_no_answer(supervisor_agent_with_rewriter, mock_user_service, mock_graphrag):
+def test_rewriter_not_called_when_no_answer(
+    supervisor_agent_with_rewriter, mock_user_service, mock_graphrag
+):
     svc = supervisor_agent_with_rewriter
     mock_user = MagicMock()
     mock_user.id = "u1"
@@ -146,7 +153,9 @@ def test_rewriter_not_called_when_no_answer(supervisor_agent_with_rewriter, mock
     svc._SupervisorAgentService__rewrite_agent.run_sync.assert_not_called()
 
 
-def test_backward_compat_no_rewrite_agent(mock_user_service, mock_graphrag, user_trajectory):
+def test_backward_compat_no_rewrite_agent(
+    mock_user_service, mock_graphrag, user_trajectory
+):
     svc = SupervisorAgentService(
         user_service=mock_user_service,
         graph_rag=mock_graphrag,
