@@ -28,6 +28,7 @@ class SupervisorAgentService:
         user_service: UserService,
         graph_rag: GraphRAG,
         hint_agent: Agent,
+        rewrite_agent: Agent | None = None,
         top_k: int = 5,
         similarity_threshold: float = 0.85,
         hint_by_similarity_threshold: int = 2,
@@ -48,6 +49,7 @@ class SupervisorAgentService:
         self.__user_service = user_service
         self.__graph_rag = graph_rag
         self.__hint_agent = hint_agent
+        self.__rewrite_agent = rewrite_agent
         self.__top_k = top_k
         self.__similarity_threshold = similarity_threshold
         self.__hint_by_similarity_threshold = hint_by_similarity_threshold
@@ -171,6 +173,22 @@ class SupervisorAgentService:
 
         return hint_triggered, hint_reason, hint_text
 
+    def __rewrite_response(self, raw_answer: str, query: str) -> str:
+        if not self.__rewrite_agent or not raw_answer:
+            return raw_answer
+
+        prompt = (
+            "Rewrite the following answer for a student. "
+            "Remove any references to internal system structures: "
+            "knowledge graph nodes, concept graph, retrieved nodes, "
+            "graph structure, PREREQUISITE_FOR relationships, "
+            "or any other internal metadata. "
+            "Make the answer natural, educational, and self-contained. "
+            "\n\nStudent question: " + query + "\n\nRaw answer: " + raw_answer
+        )
+        result = self.__rewrite_agent.run_sync(prompt)
+        return result.output.strip()
+
     def retrieve_context(
         self,
         user_id: str,
@@ -210,6 +228,9 @@ class SupervisorAgentService:
                 user_id=user.id,
             )
 
+            raw_answer = rag_result.answer if rag_result else ""
+            rewritten_answer = self.__rewrite_response(raw_answer, query)
+
             new_trajectory = models.UserTrajectory(
                 user_id=user.id,
                 query=query,
@@ -222,6 +243,7 @@ class SupervisorAgentService:
                 hint_triggered=hint_triggered,
                 hint_reason=hint_reason,
                 hint_text=hint_text,
+                raw_answer=raw_answer,
                 course_id=course_id,
             )
             self.__user_service.add_trajectory_entry(user_id, new_trajectory)
@@ -229,7 +251,7 @@ class SupervisorAgentService:
                 f"Context retrieval logged. ({interaction_type}, {node_entry_count} nodes, {response_time_sec}s)"
             )
             return SupervisorResult(
-                answer=rag_result.answer if rag_result else "",
+                answer=rewritten_answer,
                 hint_text=hint_text,
                 hint_reason=hint_reason,
             )
