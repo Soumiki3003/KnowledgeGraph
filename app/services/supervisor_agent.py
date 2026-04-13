@@ -134,8 +134,8 @@ class SupervisorAgentService:
             return ""
         lines = []
         for msg in message_history:
-            role = "Student" if msg.role == "user" else "Tutor"
-            lines.append(f"{role}: {msg.content}")
+            role = "Student" if msg["role"] == "user" else "Tutor"
+            lines.append(f"{role}: {msg['content']}")
         return "\n".join(lines)
 
     def __rewrite_query_for_retrieval(
@@ -256,7 +256,9 @@ class SupervisorAgentService:
         hint_reason = None
         hint_text = None
         history_block = self.__format_history(message_history)
-        history_context = f"\n\nRecent conversation:\n{history_block}" if history_block else ""
+        history_context = (
+            f"\n\nRecent conversation:\n{history_block}" if history_block else ""
+        )
 
         if hint_triggered:
             hint_reason = "Repeated query (possible confusion)"
@@ -436,32 +438,76 @@ class SupervisorAgentService:
                 self.__logger.warning(
                     f"Low confidence (score={scores[0]:.2f} < {self.__confidence_threshold:.2f}): '{query}'"
                 )
-                rewritten_query = self.__rewrite_query_for_retrieval(query, message_history)
+                rewritten_query = self.__rewrite_query_for_retrieval(
+                    query, message_history
+                )
                 if rewritten_query != query:
-                    rr, rn, rs, rt = self.__retrieve_node_metadata(rewritten_query, message_history)
-                    if rs and rs[0] is not None and rs[0] >= self.__confidence_threshold:
-                        self.__logger.info(f"Rewritten query succeeded (score={rs[0]:.2f})")
+                    rr, rn, rs, rt = self.__retrieve_node_metadata(
+                        rewritten_query, message_history
+                    )
+                    if (
+                        rs
+                        and rs[0] is not None
+                        and rs[0] >= self.__confidence_threshold
+                    ):
+                        self.__logger.info(
+                            f"Rewritten query succeeded (score={rs[0]:.2f})"
+                        )
                         query = rewritten_query
-                        rag_result, retrieved_nodes, scores, response_time_sec = rr, rn, rs, rt
+                        rag_result, retrieved_nodes, scores, response_time_sec = (
+                            rr,
+                            rn,
+                            rs,
+                            rt,
+                        )
                         node_entry_count = len(retrieved_nodes)
                     elif self.__content_rag:
-                        self.__logger.info("Trajectory RAG low confidence; trying content chunk RAG...")
-                        cr, cn, cs, ct = self.__retrieve_node_metadata(
-                            rewritten_query, message_history, graph_rag=self.__content_rag
+                        self.__logger.info(
+                            "Trajectory RAG low confidence; trying content chunk RAG..."
                         )
-                        if cs and cs[0] is not None and cs[0] >= self.__confidence_threshold:
-                            self.__logger.info(f"Content chunk RAG succeeded (score={cs[0]:.2f})")
+                        cr, cn, cs, ct = self.__retrieve_node_metadata(
+                            rewritten_query,
+                            message_history,
+                            graph_rag=self.__content_rag,
+                        )
+                        if (
+                            cs
+                            and cs[0] is not None
+                            and cs[0] >= self.__confidence_threshold
+                        ):
+                            self.__logger.info(
+                                f"Content chunk RAG succeeded (score={cs[0]:.2f})"
+                            )
                             query = rewritten_query
-                            rag_result, retrieved_nodes, scores, response_time_sec = cr, cn, cs, ct
+                            rag_result, retrieved_nodes, scores, response_time_sec = (
+                                cr,
+                                cn,
+                                cs,
+                                ct,
+                            )
                             node_entry_count = len(retrieved_nodes)
                         else:
-                            self.__logger.warning("All retrieval attempts below confidence threshold.")
-                            return SupervisorResult(answer=self.RESPONSE_FALLBACK, hint_text=None, hint_reason=None)
+                            self.__logger.warning(
+                                "All retrieval attempts below confidence threshold."
+                            )
+                            return SupervisorResult(
+                                answer=self.RESPONSE_FALLBACK,
+                                hint_text=None,
+                                hint_reason=None,
+                            )
                     else:
-                        self.__logger.warning("Rewritten query still below confidence threshold.")
-                        return SupervisorResult(answer=self.RESPONSE_FALLBACK, hint_text=None, hint_reason=None)
+                        self.__logger.warning(
+                            "Rewritten query still below confidence threshold."
+                        )
+                        return SupervisorResult(
+                            answer=self.RESPONSE_FALLBACK,
+                            hint_text=None,
+                            hint_reason=None,
+                        )
                 else:
-                    return SupervisorResult(answer=self.RESPONSE_FALLBACK, hint_text=None, hint_reason=None)
+                    return SupervisorResult(
+                        answer=self.RESPONSE_FALLBACK, hint_text=None, hint_reason=None
+                    )
 
             self.__logger.info("Determining interaction type...")
             interaction_type = self.__classify_intent(query)
@@ -501,7 +547,9 @@ class SupervisorAgentService:
             )
 
             raw_answer = rag_result.answer if rag_result else ""
-            rewritten_answer = self.__rewrite_response(raw_answer, query, message_history)
+            rewritten_answer = self.__rewrite_response(
+                raw_answer, query, message_history
+            )
 
             new_trajectory = models.UserTrajectory(
                 user_id=user.id,
