@@ -1,0 +1,165 @@
+{% extends "base_app.html" %}
+{% block title %}{{ survey.title }} — KnowledgeGraph{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumbs text-sm">
+    <ul>
+        <li><a href="{{ url_for('course.dashboard') }}">Courses</a></li>
+        <li>{{ survey.title }}</li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto pb-12">
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+
+            <h1 class="text-xl font-bold">{{ survey.title }}</h1>
+            {% if survey.description %}
+            <p class="text-sm text-base-content/70 mb-2">{{ survey.description }}</p>
+            {% endif %}
+
+            <div class="divider my-2"></div>
+
+            <form method="POST" action="{{ url_for('survey.submit', survey_id=survey.id) }}">
+
+                {% for section in survey.sections %}
+                <div class="mt-6">
+                    <h2 class="text-base font-semibold text-primary mb-1">{{ section.title }}</h2>
+                    {% if section.description %}
+                    <p class="text-xs text-warning bg-warning/10 rounded px-3 py-2 mb-3">{{ section.description }}</p>
+                    {% endif %}
+
+                    {% for q in section.questions %}
+
+                    {# ── Heading (sub-section label) ────────────────────── #}
+                    {% if q.type == 'heading' %}
+                    <h3 class="text-sm font-semibold mt-5 mb-2 text-base-content/70 border-b pb-1">{{ q.label }}</h3>
+
+                    {# ── Display-only (core concept) ────────────────────── #}
+                    {% elif q.type == 'display' %}
+                    <div class="form-control mb-3">
+                        <span class="text-xs font-medium text-base-content/60">{{ q.label }}</span>
+                        <span class="text-sm font-semibold">{{ q.value }}</span>
+                    </div>
+
+                    {# ── Text input ─────────────────────────────────────── #}
+                    {% elif q.type == 'text' %}
+                    <div class="form-control mb-4">
+                        <label class="label py-1">
+                            <span class="label-text text-sm font-medium">{{ q.label }}</span>
+                        </label>
+                        <input type="text" name="{{ q.id }}"
+                               class="input input-bordered input-sm w-full max-w-xs"
+                               {% if q.required %}required{% endif %} />
+                    </div>
+
+                    {# ── Number input ───────────────────────────────────── #}
+                    {% elif q.type == 'number' %}
+                    <div class="form-control mb-4">
+                        <label class="label py-1">
+                            <span class="label-text text-sm font-medium">{{ q.label }}</span>
+                        </label>
+                        <input type="number" name="{{ q.id }}" min="0"
+                               class="input input-bordered input-sm w-32"
+                               {% if q.required %}required{% endif %} />
+                    </div>
+
+                    {# ── Textarea ───────────────────────────────────────── #}
+                    {% elif q.type == 'textarea' %}
+                    <div class="form-control mb-4">
+                        <label class="label py-1">
+                            <span class="label-text text-sm font-medium">{{ q.label }}</span>
+                        </label>
+                        <textarea name="{{ q.id }}" rows="4"
+                                  class="textarea textarea-bordered text-sm w-full"
+                                  placeholder="Your answer here…"
+                                  {% if q.required %}required{% endif %}></textarea>
+                    </div>
+
+                    {# ── Radio ──────────────────────────────────────────── #}
+                    {% elif q.type == 'radio' %}
+                    <div class="form-control mb-4">
+                        <label class="label py-1">
+                            <span class="label-text text-sm font-medium">{{ q.label }}</span>
+                        </label>
+                        <div class="flex flex-col gap-1 pl-2">
+                            {% for opt in q.options %}
+                            <label class="flex items-start gap-2 cursor-pointer">
+                                <input type="radio" name="{{ q.id }}" value="{{ opt }}"
+                                       class="radio radio-sm radio-primary mt-0.5"
+                                       {% if q.required %}required{% endif %} />
+                                <span class="text-sm leading-snug">{{ opt }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {# ── Checkbox ───────────────────────────────────────── #}
+                    {% elif q.type == 'checkbox' %}
+                    <div class="form-control mb-4">
+                        <label class="label py-1">
+                            <span class="label-text text-sm font-medium">{{ q.label }}</span>
+                        </label>
+                        <div class="flex flex-col gap-1 pl-2">
+                            {% for opt in q.options %}
+                            <label class="flex items-start gap-2 cursor-pointer">
+                                <input type="checkbox" name="{{ q.id }}" value="{{ opt }}"
+                                       class="checkbox checkbox-sm checkbox-primary mt-0.5" />
+                                <span class="text-sm leading-snug">{{ opt }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {# ── Likert group ───────────────────────────────────── #}
+                    {% elif q.type == 'likert_group' %}
+                    <div class="form-control mb-4">
+                        <p class="text-sm font-medium mb-2">{{ q.label }}</p>
+                        <div class="overflow-x-auto">
+                            <table class="table table-xs w-full border border-base-200 rounded-lg">
+                                <thead class="bg-base-200">
+                                    <tr>
+                                        <th class="text-xs w-full">Statement</th>
+                                        {% for n in [1,2,3,4,5] %}
+                                        <th class="text-center text-xs">{{ n }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stmt in q.statements %}
+                                    <tr class="{% if loop.index is odd %}bg-base-100{% else %}bg-base-200/40{% endif %}">
+                                        <td class="text-xs leading-snug py-2">{{ stmt.text }}</td>
+                                        {% for n in [1,2,3,4,5] %}
+                                        <td class="text-center">
+                                            <input type="radio" name="{{ stmt.id }}" value="{{ n }}"
+                                                   class="radio radio-xs radio-primary" />
+                                        </td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-xs text-base-content/50 mt-1">1 = Strongly Disagree · 5 = Strongly Agree</p>
+                    </div>
+
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endfor %}
+
+                <div class="divider mt-4 mb-4"></div>
+                <div class="flex gap-3 justify-end">
+                    <a href="{{ url_for('course.dashboard') }}" class="btn btn-ghost btn-sm">Cancel</a>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        Submit Survey
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

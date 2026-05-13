@@ -42,35 +42,55 @@
         <div class="card bg-base-100 shadow-sm flex-1">
             <div class="card-body p-4 flex flex-col">
 
-                <!-- Chat header: course name + hint notification icon -->
+                <!-- Chat header: course name + action buttons -->
                 <div class="flex items-center justify-between mb-1">
                     <h2 class="font-semibold text-base truncate">{{ course.name }}</h2>
 
-                    <!-- Hint notification button -->
-                    <div class="relative">
+                    <div class="flex items-center gap-2 flex-shrink-0">
+
+                        <!-- Survey button (students only) -->
+                        {% if current_user.role == 'student' %}
                         <button
-                            class="btn btn-ghost btn-sm btn-circle tooltip tooltip-left"
-                            data-tip="View hints"
-                            onclick="document.getElementById('hint-modal').showModal()"
-                            hx-get="{{ url_for('course.student_hints', course_id=course_id) }}?index=0"
-                            hx-target="#hint-modal-body"
+                            class="btn btn-xs btn-soft btn-primary gap-1 rounded-full px-3"
+                            onclick="document.getElementById('survey-modal').showModal()"
+                            hx-get="{{ url_for('survey.list_surveys') }}"
+                            hx-target="#survey-modal-body"
                             hx-swap="innerHTML"
                             hx-trigger="click"
                         >
-                            <!-- Lightbulb icon -->
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
+                            Take Survey
                         </button>
+                        {% endif %}
 
-                        <!-- Badge (HTMX polling) -->
-                        <span
-                            id="hint-badge"
-                            hx-get="{{ url_for('course.student_hints_count', course_id=course_id) }}"
-                            hx-trigger="load, every 10s"
-                            hx-swap="innerHTML"
-                            class="absolute -top-1 -right-1 pointer-events-none"
-                        ></span>
+                        <!-- Hint notification button -->
+                        <div class="relative">
+                            <button
+                                class="btn btn-ghost btn-sm btn-circle tooltip tooltip-left"
+                                data-tip="View hints"
+                                onclick="document.getElementById('hint-modal').showModal()"
+                                hx-get="{{ url_for('course.student_hints', course_id=course_id) }}?index=0"
+                                hx-target="#hint-modal-body"
+                                hx-swap="innerHTML"
+                                hx-trigger="click"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                </svg>
+                            </button>
+
+                            <!-- Badge (HTMX polling) -->
+                            <span
+                                id="hint-badge"
+                                hx-get="{{ url_for('course.student_hints_count', course_id=course_id) }}"
+                                hx-trigger="load, every 10s"
+                                hx-swap="innerHTML"
+                                class="absolute -top-1 -right-1 pointer-events-none"
+                            ></span>
+                        </div>
+
                     </div>
                 </div>
 
@@ -122,6 +142,29 @@
         </div>
     </div>
 </div>
+
+<!-- ── Survey modal ───────────────────────────────────────────────── -->
+<dialog id="survey-modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-sm">
+        <div class="flex items-center gap-2 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <h3 class="font-bold text-lg">Select a Survey</h3>
+            <form method="dialog" class="ml-auto">
+                <button class="btn btn-sm btn-circle btn-ghost">✕</button>
+            </form>
+        </div>
+        <div id="survey-modal-body">
+            <div class="flex justify-center py-6">
+                <span class="loading loading-spinner loading-md text-primary"></span>
+            </div>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 
 <!-- ── Hint modal ─────────────────────────────────────────────────── -->
 <dialog id="hint-modal" class="modal modal-bottom sm:modal-middle">

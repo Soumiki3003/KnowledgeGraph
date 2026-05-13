@@ -1,0 +1,15 @@
+<ul class="menu menu-sm w-full">
+    {% for survey in surveys %}
+        {% if loop.index == 2 %}
+        <li class="menu-title mt-2">Post-Challenge Surveys</li>
+        {% endif %}
+        <li>
+            <a href="{{ url_for('survey.show_form', survey_id=survey.id) }}" target="_blank">
+                {{ survey.label }}
+                {% if survey.get('challenge_name') %}
+                <span class="text-base-content/50 text-xs ml-1">· {{ survey.challenge_name }}</span>
+                {% endif %}
+            </a>
+        </li>
+    {% endfor %}
+</ul>

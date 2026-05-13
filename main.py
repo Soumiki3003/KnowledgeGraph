@@ -5,7 +5,7 @@ from flask import current_app, Flask
 from flask_login import LoginManager
 
 from app.containers import Application
-from app.views import auth, course, knowledge
+from app.views import auth, course, knowledge, survey
 
 
 login_manager = LoginManager()
@@ -50,6 +50,7 @@ def create_app():
     app.register_blueprint(knowledge.app, url_prefix="/knowledge")
     app.register_blueprint(auth.app, url_prefix="/auth")
     app.register_blueprint(course.app, url_prefix="/")
+    app.register_blueprint(survey.app, url_prefix="/")
 
     return app
 

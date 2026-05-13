@@ -1,0 +1,40 @@
+{% extends "base_app.html" %}
+{% block title %}Survey Submitted — KnowledgeGraph{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-12">
+    <div class="card bg-base-100 shadow-sm text-center">
+        <div class="card-body items-center gap-4 py-10">
+
+            {% if success %}
+            <div class="text-success">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h1 class="text-xl font-bold">Survey Submitted</h1>
+            <p class="text-sm text-base-content/70">
+                Your responses for <strong>{{ survey.title }}</strong> have been received and emailed to your instructor.
+            </p>
+            {% else %}
+            <div class="text-error">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+            </div>
+            <h1 class="text-xl font-bold text-error">Submission Failed</h1>
+            <p class="text-sm text-base-content/70">
+                Your survey could not be sent. Please contact your instructor directly.
+            </p>
+            {% if error %}
+            <p class="text-xs text-error/70 font-mono bg-error/10 rounded px-3 py-2 w-full text-left">{{ error }}</p>
+            {% endif %}
+            {% endif %}
+
+            <a href="{{ url_for('course.dashboard') }}" class="btn btn-primary btn-sm mt-2">
+                Back to Courses
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

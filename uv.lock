@@ -1146,6 +1146,7 @@ wheels = [
 name = "griffelib"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/06/eccbd311c9e2b3ca45dbc063b93134c57a1ccc7607c5e545264ad092c4a9/griffelib-2.0.0.tar.gz", hash = "sha256:e504d637a089f5cab9b5daf18f7645970509bf4f53eda8d79ed71cce8bd97934", size = 166312, upload-time = "2026-03-23T21:06:55.954Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4d/51/c936033e16d12b627ea334aaaaf42229c37620d0f15593456ab69ab48161/griffelib-2.0.0-py3-none-any.whl", hash = "sha256:01284878c966508b6d6f1dbff9b6fa607bc062d8261c5c7253cb285b06422a7f", size = 142004, upload-time = "2026-02-09T19:09:40.561Z" },
 ]
@@ -1566,6 +1567,7 @@ name = "knowledgegraph"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "bcrypt" },
     { name = "beautifulsoup4" },
     { name = "dependency-injector" },
@@ -1582,8 +1584,10 @@ dependencies = [
     { name = "pydantic-ai" },
     { name = "pymupdf" },
     { name = "pytesseract" },
+    { name = "python-docx" },
     { name = "python-pptx" },
     { name = "pyyaml" },
+    { name = "reportlab" },
     { name = "uuid-utils" },
 ]
 
@@ -1603,6 +1607,7 @@ logfire = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=0.84.0" },
     { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "beautifulsoup4", specifier = ">=4.14.3" },
     { name = "dependency-injector", specifier = ">=4.48.3" },
@@ -1619,8 +1624,10 @@ requires-dist = [
     { name = "pydantic-ai", specifier = ">=1.68.0" },
     { name = "pymupdf", specifier = ">=1.27.2" },
     { name = "pytesseract", specifier = ">=0.3.13" },
+    { name = "python-docx", specifier = ">=1.2.0" },
     { name = "python-pptx", specifier = ">=1.0.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "reportlab", specifier = ">=4.5.0" },
     { name = "uuid-utils", specifier = ">=0.14.1" },
 ]
 
@@ -2988,6 +2995,19 @@ wheels = [
 ]
 
 [[package]]
+name = "python-docx"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "lxml" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a9/f7/eddfe33871520adab45aaa1a71f0402a2252050c14c7e3009446c8f4701c/python_docx-1.2.0.tar.gz", hash = "sha256:7bc9d7b7d8a69c9c02ca09216118c86552704edc23bac179283f2e38f86220ce", size = 5723256, upload-time = "2025-06-16T20:46:27.921Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/00/1e03a4989fa5795da308cd774f05b704ace555a70f9bf9d3be057b680bcf/python_docx-1.2.0-py3-none-any.whl", hash = "sha256:3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7", size = 252987, upload-time = "2025-06-16T20:46:22.506Z" },
+]
+
+[[package]]
 name = "python-dotenv"
 version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3212,6 +3232,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/14/bd/ee13b20b763b8989f7c75d592bfd5de37dc1181814a2a2747fedcf97e3ba/regex-2026.2.28-cp314-cp314t-win32.whl", hash = "sha256:bbb882061f742eb5d46f2f1bd5304055be0a66b783576de3d7eef1bed4778a6e", size = 274936, upload-time = "2026-02-28T02:19:36.313Z" },
     { url = "https://files.pythonhosted.org/packages/cb/e7/d8020e39414c93af7f0d8688eabcecece44abfd5ce314b21dfda0eebd3d8/regex-2026.2.28-cp314-cp314t-win_amd64.whl", hash = "sha256:6591f281cb44dc13de9585b552cec6fc6cf47fb2fe7a48892295ee9bc4a612f9", size = 284779, upload-time = "2026-02-28T02:19:38.625Z" },
     { url = "https://files.pythonhosted.org/packages/13/c0/ad225f4a405827486f1955283407cf758b6d2fb966712644c5f5aef33d1b/regex-2026.2.28-cp314-cp314t-win_arm64.whl", hash = "sha256:dee50f1be42222f89767b64b283283ef963189da0dda4a515aa54a5563c62dec", size = 275010, upload-time = "2026-02-28T02:19:40.65Z" },
+]
+
+[[package]]
+name = "reportlab"
+version = "4.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "charset-normalizer" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/23/b8a8b9a5e596ce3de71237c8d6c6a976c763e930878b16340aff3d67ed53/reportlab-4.5.0.tar.gz", hash = "sha256:e595932789ab7a107ba253e83f7815622708a9fd49920d0d6a909880eb66ac75", size = 3914127, upload-time = "2026-04-29T09:12:26.785Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/13/bc43591a54dd38ac5c19e7e849f0311d879737a0d07e032e5be79849a5fb/reportlab-4.5.0-py3-none-any.whl", hash = "sha256:b8cc8996947d84e805368b47b2376070966f091d029351a0d8a1f238984c2c7f", size = 1957238, upload-time = "2026-04-29T09:12:22.904Z" },
 ]
 
 [[package]]
