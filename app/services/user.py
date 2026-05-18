@@ -511,6 +511,43 @@ class UserService:
         with self.__session_factory() as session:
             return session.execute_read(tx_fn, user_id, course_id, expiry_threshold)
 
+    def get_all_course_hints_for_student(
+        self, user_id: str, course_id: str
+    ) -> list[models.UserTrajectory]:
+        """Return all approved hints for a student in a course (no expiry filter).
+
+        Used by the survey so students can review every hint they received
+        regardless of when it was read.
+        """
+        @unit_of_work()
+        def tx_fn(
+            tx: ManagedTransaction, user_id: str, course_id: str
+        ) -> list[models.UserTrajectory]:
+            query = f"""
+            MATCH (u:{self.__user_node_name})-[:{self.__trajectory_rel_name}]->(t:{self.__trajectory_node_name})
+            WHERE u.id = $user_id
+              AND t.course_id = $course_id
+              AND t.hint_triggered = true
+              AND t.hint_approval_status = $approval_status
+            RETURN t, u.id AS user_id
+            ORDER BY t.timestamp ASC
+            """
+            result = tx.run(
+                query,
+                user_id=user_id,
+                course_id=course_id,
+                approval_status=models.HintApprovalStatus.APPROVED,
+            )
+            items = []
+            for record in result:
+                data = dict(record["t"])
+                data["user_id"] = record["user_id"]
+                items.append(models.UserTrajectory(**data))
+            return items
+
+        with self.__session_factory() as session:
+            return session.execute_read(tx_fn, user_id, course_id)
+
     def mark_hint_read(self, trajectory_id: str, course_id: str) -> None:
         """Record the first time a student sees a hint (sets ``hint_read_when``).
 

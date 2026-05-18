@@ -4,7 +4,7 @@
         <li class="menu-title mt-2">Post-Challenge Surveys</li>
         {% endif %}
         <li>
-            <a href="{{ url_for('survey.show_form', survey_id=survey.id) }}" target="_blank">
+            <a href="{{ url_for('survey.show_form', survey_id=survey.id) }}{% if course_id %}?course_id={{ course_id }}{% endif %}" target="_blank">
                 {{ survey.label }}
                 {% if survey.get('challenge_name') %}
                 <span class="text-base-content/50 text-xs ml-1">· {{ survey.challenge_name }}</span>

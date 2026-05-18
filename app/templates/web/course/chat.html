@@ -53,7 +53,7 @@
                         <button
                             class="btn btn-xs btn-soft btn-primary gap-1 rounded-full px-3"
                             onclick="document.getElementById('survey-modal').showModal()"
-                            hx-get="{{ url_for('survey.list_surveys') }}"
+                            hx-get="{{ url_for('survey.list_surveys') }}?course_id={{ course_id }}"
                             hx-target="#survey-modal-body"
                             hx-swap="innerHTML"
                             hx-trigger="click"

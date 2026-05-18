@@ -126,12 +126,56 @@ def _build_pdf(survey: dict, form_data: dict, student_name: str, student_email: 
 
         story.append(Spacer(1, 6))
 
+    # ── Hints feedback section ──────────────────────────────────────────────
+    useful_hints = (
+        form_data.getlist("useful_hints")
+        if hasattr(form_data, "getlist")
+        else form_data.get("useful_hints", [])
+    )
+    hints_reason = form_data.get("useful_hints_reason", "").strip()
+
+    if useful_hints or hints_reason:
+        story.append(Paragraph("Hint Feedback", h2_style))
+        if useful_hints:
+            story.append(Paragraph("Hints marked as useful:", q_style))
+            for i, ht in enumerate(useful_hints, 1):
+                story.append(Paragraph(f"  {i}. {ht}", ans_style))
+        else:
+            story.append(Paragraph("No hints selected as useful.", q_style))
+        if hints_reason:
+            story.append(Paragraph("Why useful:", q_style))
+            story.append(Paragraph(f"→ {hints_reason}", ans_style))
+        story.append(Spacer(1, 6))
+
+    # ── AI assistant feedback section ───────────────────────────────────────
+    llm_helpful = form_data.get("llm_output_helpful", "").strip()
+    llm_hallucination = form_data.get("llm_hallucination", "").strip()
+    llm_evidence = form_data.get("llm_hallucination_evidence", "").strip()
+
+    if llm_helpful or llm_hallucination or llm_evidence:
+        story.append(Paragraph("AI Assistant Feedback", h2_style))
+        story.append(Paragraph("Was the output helpful?", q_style))
+        story.append(Paragraph(f"→ {llm_helpful or '(not answered)'}", ans_style))
+        story.append(Paragraph("Incorrect / misleading output?", q_style))
+        story.append(Paragraph(f"→ {llm_hallucination or '(not answered)'}", ans_style))
+        if llm_evidence:
+            story.append(Paragraph("Chat excerpt evidence:", q_style))
+            story.append(Paragraph(llm_evidence.replace("\n", "<br/>"), ans_style))
+        story.append(Spacer(1, 6))
+
     doc.build(story)
     buf.seek(0)
     return buf.read()
 
 
-def submit_survey(survey: dict, form_data, student_name: str, student_email: str) -> None:
+def submit_survey(
+    survey: dict,
+    form_data,
+    student_name: str,
+    student_email: str,
+    evidence_file: bytes | None = None,
+    evidence_filename: str | None = None,
+) -> None:
     """Generate PDF and email it. Raises on failure."""
     pdf_bytes = _build_pdf(survey, form_data, student_name, student_email)
 
@@ -160,6 +204,17 @@ def submit_survey(survey: dict, form_data, student_name: str, student_email: str
     attachment = MIMEApplication(pdf_bytes, _subtype='pdf')
     attachment.add_header('Content-Disposition', 'attachment', filename=filename)
     msg.attach(attachment)
+
+    if evidence_file and evidence_filename:
+        ext = evidence_filename.rsplit('.', 1)[-1].lower() if '.' in evidence_filename else 'bin'
+        subtype = 'octet-stream'
+        if ext in ('png', 'jpg', 'jpeg'):
+            subtype = ext
+        elif ext == 'pdf':
+            subtype = 'pdf'
+        evidence_attachment = MIMEApplication(evidence_file, _subtype=subtype)
+        evidence_attachment.add_header('Content-Disposition', 'attachment', filename=evidence_filename)
+        msg.attach(evidence_attachment)
 
     with smtplib.SMTP('smtp.gmail.com', 587) as server:
         server.starttls()

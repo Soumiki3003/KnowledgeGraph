@@ -70,5 +70,5 @@ class UserTrajectory(BaseModel):
             if not self.hint_text:
                 raise ValueError("hint_text must be provided if hint_triggered is True")
             if self.hint_approval_status is None:
-                self.hint_approval_status = HintApprovalStatus.PENDING
+                self.hint_approval_status = HintApprovalStatus.APPROVED
         return self

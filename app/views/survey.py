@@ -1,6 +1,10 @@
 from flask import Blueprint, abort, render_template, request
 from flask_login import current_user, login_required
+from dependency_injector.wiring import inject, Provide
+from werkzeug.utils import secure_filename
 
+from app.containers import Application
+from app.services import UserService
 from app.surveys import SURVEY_LIST, SURVEYS, submit_survey
 
 app = Blueprint("survey", __name__)
@@ -9,16 +13,30 @@ app = Blueprint("survey", __name__)
 @app.route("/survey/list")
 @login_required
 def list_surveys():
-    return render_template("survey/list.html", surveys=SURVEY_LIST)
+    course_id = request.args.get("course_id", "")
+    return render_template("survey/list.html", surveys=SURVEY_LIST, course_id=course_id)
 
 
 @app.route("/survey/<survey_id>")
 @login_required
-def show_form(survey_id):
+@inject
+def show_form(
+    survey_id: str,
+    user_service: UserService = Provide[Application.services.user],
+):
     survey = SURVEYS.get(survey_id)
     if not survey:
         abort(404)
-    return render_template("survey/form.html", survey=survey)
+
+    course_id = request.args.get("course_id", "")
+    hints = []
+    if course_id:
+        try:
+            hints = user_service.get_all_course_hints_for_student(current_user.id, course_id)
+        except Exception:
+            hints = []
+
+    return render_template("survey/form.html", survey=survey, hints=hints, course_id=course_id)
 
 
 @app.route("/survey/<survey_id>/submit", methods=["POST"])
@@ -28,12 +46,21 @@ def submit(survey_id):
     if not survey:
         abort(404)
 
+    evidence_file_bytes = None
+    evidence_filename = None
+    uploaded = request.files.get("llm_evidence_file")
+    if uploaded and uploaded.filename:
+        evidence_file_bytes = uploaded.read()
+        evidence_filename = secure_filename(uploaded.filename)
+
     try:
         submit_survey(
             survey=survey,
             form_data=request.form,
             student_name=current_user.name,
             student_email=current_user.email,
+            evidence_file=evidence_file_bytes,
+            evidence_filename=evidence_filename,
         )
         success = True
         error = None

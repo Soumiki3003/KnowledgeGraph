@@ -37,6 +37,7 @@ def create_app():
             "app.views.knowledge",
             "app.views.auth",
             "app.views.course",
+            "app.views.survey",
         ]
     )
 
