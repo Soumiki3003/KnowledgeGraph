@@ -187,7 +187,8 @@
                 </div>
                 {% endif %}
 
-                {# ── AI assistant quality feedback ────────────────────────── #}
+                {# ── AI assistant quality feedback (not shown on pre-study) ── #}
+                {% if survey.id != 'pre_study' %}
                 <div class="mt-6">
                     <h2 class="text-base font-semibold text-primary mb-1">AI Assistant Feedback</h2>
                     <p class="text-xs text-base-content/50 mb-3">Help us improve by rating the quality of the AI responses you received.</p>
@@ -248,6 +249,7 @@
                         </label>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="divider mt-4 mb-4"></div>
                 <div class="flex gap-3 justify-end">

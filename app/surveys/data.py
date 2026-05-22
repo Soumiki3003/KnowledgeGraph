@@ -38,6 +38,12 @@ _LIKERT_SECTION = {
             ],
         },
         {
+            'id': 'b2_helpful_description',
+            'label': 'Q4b. In your own words, how did the hint(s) help you? What specifically was useful?',
+            'type': 'textarea',
+            'required': False,
+        },
+        {
             'id': 'b2_feedback',
             'label': 'Q5. If any hint was confusing, unhelpful, or too revealing, briefly describe what was wrong with it:',
             'type': 'textarea',
@@ -254,14 +260,7 @@ def _challenge(num_str, name, core_concept, b1_questions):
                         'options': ['Yes, fully', 'Partially', 'Did not complete'],
                         'required': True,
                     },
-                    {
-                        'id': 'condition',
-                        'label': 'Condition',
-                        'type': 'radio',
-                        'options': ['Using MAS', 'Using GPT'],
-                        'required': True,
-                    },
-                    {'id': 'time_spent', 'label': 'Time spent (minutes)', 'type': 'number', 'required': True},
+{'id': 'time_spent', 'label': 'Time spent (minutes)', 'type': 'number', 'required': True},
                 ],
             },
             {
