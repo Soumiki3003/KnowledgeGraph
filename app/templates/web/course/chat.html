@@ -18,6 +18,12 @@
         overflow-y: auto;
     }
 </style>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var el = document.getElementById('chat-messages');
+        if (el) el.scrollTop = el.scrollHeight;
+    });
+</script>
 {% endblock %}
 
 {% block content %}
@@ -105,6 +111,20 @@
                             <p class="text-sm">Ask questions about {{ course.name }}</p>
                         </div>
                     </div>
+                    {% else %}
+                    {% for msg in messages %}
+                        {% if msg.role == 'user' %}
+                        <div class="chat chat-end">
+                            <div class="chat-header">{{ current_user.name }}</div>
+                            <div class="chat-bubble chat-bubble-primary">{{ msg.content }}</div>
+                        </div>
+                        {% else %}
+                        <div class="chat chat-start">
+                            <div class="chat-header">Assistant</div>
+                            <div class="chat-bubble md-bubble">{{ msg.content }}</div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
                     {% endif %}
                 </div>
 

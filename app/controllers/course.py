@@ -119,6 +119,11 @@ class CourseController:
         self.__logger.info(f"Clearing course: {course_id}")
         self.__knowledge_service.clear_course(course_id)
 
+    def get_chat_history(
+        self, user_id: str, course_id: str
+    ) -> list[models.ChatMessage]:
+        return self.__chat_service.get_messages(user_id, course_id)
+
     def chat_send(
         self, user_id: str, course_id: str, message: str
     ) -> schemas.ChatResponse:

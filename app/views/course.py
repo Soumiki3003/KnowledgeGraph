@@ -72,11 +72,12 @@ def chat(
     ],
 ):
     course = course_controller.get_course(course_id)
+    messages = course_controller.get_chat_history(current_user.id, course_id)
     return render_template(
         "course/chat.html",
         course=course,
         course_id=course_id,
-        messages=[],
+        messages=messages,
     )
 
 
